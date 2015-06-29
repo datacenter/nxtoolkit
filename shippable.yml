@@ -1,0 +1,23 @@
+language: python
+python:
+  - "2.7"
+  - "pypy"
+cache: true
+
+before_install:
+   - mkdir -p shippable/codecoverage
+
+install: 
+  - "pip install requests"
+  - "pip install coverage"
+  - "python setup.py -q develop"
+
+script:
+  - coverage run -p tests/nxtoolkit_test.py
+  - coverage run -p tests/nxphysobject_test.py
+  - coverage run -p tests/nxtoolkitlib_test.py
+
+after_success:
+  - coverage combine
+  - coverage report --include=*nxtoolkit*
+  - coverage xml -o shippable/codecoverage/coverage.xml --include=*nxtoolkit*
