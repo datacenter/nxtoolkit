@@ -44,7 +44,7 @@ class TestCredentials(unittest.TestCase):
 
     def test_create_apic_string_only(self):
         """
-        Basic test for only APIC Credentials qualifiers
+        Basic test for only Switch Credentials qualifiers
         passed as a single string
         """
         creds = Credentials('apic')
@@ -52,7 +52,7 @@ class TestCredentials(unittest.TestCase):
 
     def test_create_apic_list_only(self):
         """
-        Basic test for only APIC Credentials qualifiers
+        Basic test for only Switch Credentials qualifiers
         passed as a single string in a list
         """
         creds = Credentials(['apic'])

@@ -18,8 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and displays all
-of the Interfaces.
+Simple application that logs on to the Switch and configure the Interfaces.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -34,7 +33,7 @@ def main():
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
     description = '''Simple application that logs on to the Switch and 
-                    displays all of the Interfaces.'''
+                    configure the Interfaces.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -45,28 +44,59 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
 
-    # Download all of the interfaces
-    # and store the data as tuples in a list
-    data = []
-    interfaces = NX.Interface.get(session)
-    for interface in interfaces:
-        data.append((interface.attributes['if_name'],
-                     interface.attributes['porttype'],
-                     interface.attributes['adminstatus'],
-                     interface.attributes['operSt'],
-                     interface.attributes['speed'],
-                     interface.attributes['mtu'],
-                     interface.attributes['usage']))
+    int1 = NX.Interface('eth1/13')
+    int2 = NX.Interface('eth1/14')
+    
+    # ConfigInterfacs object is used to configure multiple 
+    # interfaces at a time (No need of multiple REST calls)
+    # Note: Using Interface object also an interface can be configured
+    config = NX.ConfigInterfaces()
+    
+    # Adding interfaces to be configured
+    config.add_interface(int1)
+    config.add_interface(int2)
+    
+    # Setting interface attributes 
+    # Note: if attributes are not set, then default values will be used
+    int1.set_admin_status('up')
+    int1.set_layer('Layer2')
+    int1.set_duplex('auto')
+    int1.set_link_log('default')
+    int1.set_mode('access')
+    int1.set_speed('10G')
+    int1.set_access_vlan('vlan-100')
+    int1.set_trunk_log('default')
+    int1.set_link_log('default')
 
-    # Display the data downloaded
-    template = "{0:17} {1:6} {2:^6} {3:^6} {4:7} {5:6} {6:9}"
-    print(template.format("INTERFACE", "TYPE", "ADMIN", "OPER",
-                          "SPEED", "MTU", "USAGE"))
-    print(template.format("---------", "----", "------", "------",
-                          "-----", "---", "---------"))
-    for rec in data:
-        print(template.format(*rec))
+    # Push entire configuration to the switch
+    # Note:To configure only one interface use int1.get_url() & int1.get_json()
+    resp = session.push_to_switch(config.get_url(), config.get_json())
+    if not resp.ok:
+        print ('%% Could not push to Switch')
+        print resp.text
+        sys.exit(0)
 
+    ethpm = NX.Ethpm()
+    ethpm.set_default_admin_st('up')
+    ethpm.set_default_layer('Layer2')
+    ethpm.set_jumbomtu('9216')
+    ethpm.set_unsupported_transceiver('yes')
+
+    resp = session.push_to_switch(ethpm.get_url(), ethpm.get_json())
+    if not resp.ok:
+        print ('%% Could not push to Switch')
+        print resp.text
+        sys.exit(0)
+    
+    # Uncomment below lines to get the configured ethpm
+    '''   
+    resp = NX.Ethpm.get(session)
+    print "Ethpm :\n======="
+    print "Admin status             :", resp.get_default_admin_st()
+    print "Default layer            :", resp.get_default_layer()
+    print "Jumbo mtu                :", resp.get_jumbomtu()
+    print "Unsupported-transceiver: :", resp.get_unsupported_transceiver()
+    '''
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,4 @@
-__author__ = 'edsall'
 #!/usr/bin/env python
-################################################################################
 ################################################################################
 #                                                                              #
 # Copyright (c) 2015 Cisco Systems                                             #
@@ -25,8 +23,8 @@ __author__ = 'edsall'
 class Searchable(object):
     """
     This class hold a search term as a keyword, value pair and a list
-    of nxtoolkit objects that are related to that term.  The first item on the list is
-    the object where the term came from and is considered a "primary" object.  Subsequent objects
+    of nxtoolkit objects that are related to that term.  The first 
+    item on the list is the object where the term came from and is considered a "primary" object.  Subsequent objects
     on the list are added as the instance of Searchable is passed up the object heirarchy and
     they provide context for the primary object.
 
@@ -48,7 +46,8 @@ class Searchable(object):
         Creates report of basic switch information
         :param keyword: Keyword for a search
         :param value: Optional value for the keyword
-        :param relation: Indication of whether the information is first hand, primary, or indirect
+        :param relation: Indication of whether the information is first hand,
+               primary, or indirect
         """
         if isinstance(value, unicode):
             value = str(value)
@@ -67,7 +66,8 @@ class Searchable(object):
 
     def add_context(self, nx_object):
         """
-        Method to add an nxobject to a Searchable instance.  It will simply be appended to the end of the list
+        Method to add an nxobject to a Searchable instance.  It will simply be
+        appended to the end of the list
 
         :param nx_object: nxtoolkit object
         """
@@ -106,15 +106,15 @@ class Searchable(object):
 
 class NxSearch(object):
     """
-    This class is a base class that creates a method for rolling up through the object heirarchy all of the
-    Searchable instances.
+    This class is a base class that creates a method for rolling up through 
+    the object heirarchy all of the Searchable instances.
     """
 
     def get_searchable(self):
         """
-        Method to recursively retrieve all of the searchable items from all the children objects, add
-        the current object to them as additional context, append the local searchable terms, and
-        return the result.
+        Method to recursively retrieve all of the searchable items from all 
+        the children objects, add the current object to them as additional 
+        context, append the local searchable terms, and return the result.
         """
 
         searchables = self._define_searchables()
@@ -134,6 +134,3 @@ class NxSearch(object):
         result = []
         # result.append(Searchable(keyword, value, relationship))
         return result
-
-
-

@@ -18,39 +18,71 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that shows all of the processes running on a switch
+Simple application that logs on to the Switch and create port channel
+and attach the specified interfaces to that port channel
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
-
+import time
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile
+    description = 'create port channel and attach interface'
+    creds = NX.Credentials('switch', description)
     args = creds.get()
 
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
+    
+    # ConfigInterfaces instance is required to configure multiple port 
+    # channel at a time
+    config = NX.ConfigInterfaces()
+    
+    
+    # Create a POrtChannels object
+    pc1 = NX.PortChannel('444')
+    pc2 = NX.PortChannel('445')
+    
+    int1 = NX.Interface('eth1/5')
+    int2 = NX.Interface('eth1/8')
+    int3 = NX.Interface('eth1/9')
+    
+    # Attach interfaces to the port channel
+    pc1.attach(int1)
+    pc1.attach(int2)
+    pc2.attach(int3)
+    
+    # Add port channels to the config object
+    config.add_port_channel(pc1)
+    config.add_port_channel(pc2)
+    
+    print config.get_json()
+    
+    # Push/ create the port channel object to the switch
+    # Note: To configure only single port channel use pc1.get_url() and 
+    # pc1.get_json() instead of config.get_url() and config.get_json()
+    resp = session.push_to_switch(config.get_url(), config.get_json())
+    if not resp.ok:
+        print('%% Could not push to Switch: %s' % (resp.text))
+        sys.exit(0)
+    
 
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
-
-
+    # To delete the created port-channel (Uncomment below lines to
+    # delete the port channel)
+    # resp = session.delete(pc1.get_url())
+    #if not resp.ok:
+    #    print('%% Could not push to Switch: %s' % (resp.text))
+    #    sys.exit(0)
+    
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()

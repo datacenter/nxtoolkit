@@ -18,39 +18,47 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that shows all of the processes running on a switch
+Simple application that logs on to the Switch and show port channels
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
-
+import time
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile
+    description = '''Simple application that logs on to the Switch
+                and show port channels'''
+    creds = NX.Credentials('switch', description)
     args = creds.get()
 
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
-
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
-
-
+    
+    pc_list = []
+    port_channels = NX.PortChannel.get(session)
+    template = "{0:16} {1:15} {2:16} {3:16} {4:16}"
+    print(template.format(" Group   ", " Port channel ", " Layer ",
+                          "Port channel Mode", " Members "))
+    print(template.format("---------", " ------------ ", " ----- ",
+                          "-----------------", " --------"))
+    for pc in port_channels:
+        pc_list.append((pc.pc_id, pc.name, pc.layer, pc.pc_mode,
+                        [str(iface.if_name) for iface in pc._interfaces]))
+    
+    # Display all the downloaded data
+    for rec in pc_list:
+        print(template.format(*rec))
+        
+    
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()

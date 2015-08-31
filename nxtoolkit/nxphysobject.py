@@ -1,15 +1,4 @@
 ################################################################################
-#                                  _    ____ ___                               #
-#                                 / \  / ___|_ _|                              #
-#                                / _ \| |    | |                               #
-#                               / ___ \ |___ | |                               #
-#                         _____/_/   \_\____|___|_ _                           #
-#                        |_   _|__   ___ | | | _(_) |_                         #
-#                          | |/ _ \ / _ \| | |/ / | __|                        #
-#                          | | (_) | (_) | |   <| | |_                         #
-#                          |_|\___/ \___/|_|_|\_\_|\__|                        #
-#                                                                              #
-################################################################################
 #                                                                              #
 # Copyright (c) 2015 Cisco Systems                                             #
 # All Rights Reserved.                                                         #
@@ -40,121 +29,6 @@ import copy
 from .nxSearch import Searchable
 
 
-class Systemcontroller(BaseNXPhysModule):
-    """ class of the motherboard of the APIC controller node   """
-
-    def __init__(self, slot, parent=None):
-        """ Initialize the basic object.  It will create the name
-        of the Systemcontroller and set the type
-        before calling the base class __init__ method.
-
-        :param pod: pod id
-        :param node: node id
-        :param slot: slot id
-        :param parent: optional parent object
-
-        """
-        self.type = 'systemctrlcard'
-        self.check_parent(parent)
-        super(Systemcontroller, self).__init__(slot, parent)
-        self.name = 'SysC-' + '/'.join([slot])
-
-    @classmethod
-    def _get_switch_classes(cls):
-        """
-        Get the APIC classes used by this nxtoolkit class.
-
-        :returns: list of strings containing APIC class names
-        """
-        resp = ['eqptBoard']
-
-        return resp
-
-    @staticmethod
-    def _get_parent_class():
-        """
-        Gets the nxtoolkit class of the parent object
-
-        :returns: class of parent object
-        """
-        return Node
-
-    @classmethod
-    def get(cls, session, parent=None):
-        """Gets all of the System controllers from the APIC.
-        This information comes from
-        the APIC 'eqptBoard' class.
-
-        If parent is specified, it will only get system
-        controllers that are children of the the parent.
-        The system controlles will also be added as children
-        to the parent Node.
-
-        :param session: APIC session
-        :param parent: parent Node
-
-        :returns: list of Systemcontrollers
-        """
-        return cls.get_obj(session, cls._get_switch_classes(), parent)
-
-    @staticmethod
-    def _parse_dn(dn):
-        """Parses the pod, node from a
-           distinguished name of the node and fills in the slot to be '1'
-
-           :param dn: dn of node
-
-           :returns: pod, node, slot
-        """
-        name = dn.split('/')
-        pod = str(name[1].split('-')[1])
-        node = str(name[2].split('-')[1])
-        slot = '1'
-        return pod, node, slot
-
-    def _get_firmware(self, dn):
-        """Gets the firmware version of the System controller
-        from the firmwareCtrlrRunning attribute of the
-        ctrlrrunning object under the ctrlrfwstatuscont object.
-        It will set the bios to None.
-
-        :param dn: dn of node
-
-        :returns: firmware, bios
-        """
-        name = dn.split('/')
-        new_dist_name = '/'.join(name[0:4])
-
-        mo_query_url = '/api/mo/' + new_dist_name + \
-                       '/ctrlrfwstatuscont/ctrlrrunning.json?query-target=self'
-        ret = self._session.get(mo_query_url)
-        node_data = ret.json()['imdata']
-
-        firmware = None
-        if node_data:
-            if 'firmwareCtrlrRunning' in node_data[0]:
-                firmware = str(node_data[0]['firmwareCtrlrRunning']['attributes']['version'])
-
-        bios = None
-        return firmware, bios
-
-    def _populate_from_attributes(self, attributes):
-        """Fills in an object with the desired attributes.
-           Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
-        :param attributes:
-        """
-        self.serial = str(attributes['ser'])
-        self.model = str(attributes['model'])
-        self.dn = str(attributes['dn'])
-        self.descr = str(attributes['descr'])
-        self.type = str(attributes['type'])
-        self.oper_st = str(attributes['operSt'])
-        self.modify_time = str(attributes['modTs'])
-        # I think this is a bug fix to the APIC controller.  The type should be set correctly.
-        if self.type == 'unknown':
-            self.type = 'systemctrlcard'
-
 
 class Linecard(BaseNXPhysModule):
     """ class for a linecard of a switch   """
@@ -176,8 +50,9 @@ class Linecard(BaseNXPhysModule):
 
         `>>> lc = Linecard(slot_id, parent_switch)`
 
-        :param slot: slot_id if arg1 is node_id  Not required if arg1 is a Node
-        :param parent: parent switch of type Node.  Not required if arg1 is used instead.
+        :param slot: slot_id if arg1 is node_id Not required if arg1 is a Node
+        :param parent: parent switch of type Node.  Not required if arg1 is 
+               used instead.
 
         :returns: None
         """
@@ -189,9 +64,9 @@ class Linecard(BaseNXPhysModule):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['eqptLC']
 
@@ -210,7 +85,9 @@ class Linecard(BaseNXPhysModule):
     def _get_children_classes():
         """
         Get the nxtoolkit class of the children of this object.
-        This is meant to be overridden by any inheriting classes that have children.
+
+        This is meant to be overridden by any inheriting classes that have 
+        children.
         If they don't have children, this will return an empty list.
         :return: list of classes
         """
@@ -218,14 +95,14 @@ class Linecard(BaseNXPhysModule):
 
     @classmethod
     def get(cls, session, parent=None):
-        """Gets all of the linecards from the APIC.  If parent is
+        """Gets all of the linecards from the Switch.  If parent is
         specified, it will only get linecards that are
         children of the the parent.  The linecards will also
         be added as children to the parent Node.
 
-        The lincard object is derived mostly from the APIC 'eqptLC' class.
+        The lincard object is derived mostly from the Switch 'eqptLC' class.
 
-        :param session: APIC session
+        :param session: Switch session
         :param parent: optional parent of class Node
 
         :returns: list of linecards
@@ -235,7 +112,7 @@ class Linecard(BaseNXPhysModule):
     def _populate_from_attributes(self, attributes):
         """Fills in an object with the desired attributes.
            Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
+           when getting objects from the Switch.
         """
         self.serial = str(attributes['ser'])
         self.model = str(attributes['model'])
@@ -296,9 +173,9 @@ class Supervisorcard(BaseNXPhysModule):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['eqptSupC']
 
@@ -315,32 +192,30 @@ class Supervisorcard(BaseNXPhysModule):
 
     @classmethod
     def get(cls, session, parent_node=None):
-        """Gets all of the supervisor cards from the APIC.
+        """Gets all of the supervisor cards from the Switch.
         If parent is specified, it will only get the
         supervisor card that is a child of the the parent Node.
         The supervisor will also be added as a child to the parent Node.
 
         The Supervisorcard object is derived mostly from the
-        APIC 'eqptSupC' class.
+        Switch 'eqptSupC' class.
 
         If `parent_node` is a str, then it is the Node id of the switch
         for the supervisor.
 
-        :param session: APIC session
-        :param parent_node: optional parent switch of class Node or the node id of a switch
+        :param session: Switch session
+        :param parent_node: optional parent switch of class Node or the node
+               id of a switch
 
         :returns: list of linecards
         """
-        #        if parent_node:
-        #            if not isinstance(parent_node, Node) and not isinstance(parent_node, str):
-        #                raise TypeError('An instance of Node class or node id string is requried')
 
         return cls.get_obj(session, cls._get_switch_classes(), parent_node)
 
     def _populate_from_attributes(self, attributes):
         """Fills in an object with the desired attributes.
            Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
+           when getting objects from the Switch.
         """
         self.serial = str(attributes['ser'])
         self.model = str(attributes['model'])
@@ -400,9 +275,9 @@ class Fantray(BaseNXPhysModule):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['eqptFt']
 
@@ -421,36 +296,37 @@ class Fantray(BaseNXPhysModule):
     def _get_children_classes():
         """
         Get the nxtoolkit class of the children of this object.
-        This is meant to be overridden by any inheriting classes that have children.
-        If they don't have children, this will return an empty list.
+        
+        This is meant to be overridden by any inheriting classes that 
+        have children. If they don't have children, this will return
+        an empty list.
         :return: list of classes
         """
         return [Fan]
 
     @classmethod
     def get(cls, session, parent=None):
-        """Gets all of the fantrays from the APIC.  If parent
-        is specified, it will only get fantrays that are
+        """Gets all of the fantrays from the Switch.
+
+        If parent is specified, it will only get fantrays that are
         children of the the parent.  The fantrays will
         also be added as children to the parent Node.
 
-        The fantray object is derived mostly from the APIC 'eqptFt' class.
+        The fantray object is derived mostly from the Switch 'eqptFt' class.
 
-        :param session: APIC session
+        :param session: Switch session
         :param parent: optional parent switch of class Node
 
         :returns: list of fantrays
         """
-        #        if parent:
-        #            if not isinstance(parent, Node):
-        #                raise TypeError('An instance of Node class is requried')
+
         fans = cls.get_obj(session, cls._get_switch_classes(), parent)
         return fans
 
     def _populate_from_attributes(self, attributes):
         """Fills in an object with the desired attributes.
            Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
+           when getting objects from the Switch.
         """
         self.serial = str(attributes['ser'])
         self.model = str(attributes['model'])
@@ -530,9 +406,9 @@ class Fan(BaseNXPhysModule):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['eqptFan']
 
@@ -549,14 +425,14 @@ class Fan(BaseNXPhysModule):
 
     @classmethod
     def get(cls, session, parent=None):
-        """Gets all of the fans from the APIC.  If parent
+        """Gets all of the fans from the Switch.  If parent
         is specified, it will only get fantrays that are
         children of the the parent.  The fantrays will
         also be added as children to the parent Node.
 
-        The fan object is derived mostly from the APIC 'eqptFan' class.
+        The fan object is derived mostly from the Switch 'eqptFan' class.
 
-        :param session: APIC session
+        :param session: Switch session
         :param parent: optional parent fantray of class Fantray
 
         :returns: list of fans
@@ -642,9 +518,9 @@ class Powersupply(BaseNXPhysModule):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['eqptPsu']
 
@@ -661,14 +537,14 @@ class Powersupply(BaseNXPhysModule):
 
     @classmethod
     def get(cls, session, parent=None):
-        """Gets all of the power supplies from the APIC.
+        """Gets all of the power supplies from the Switch.
         If parent is specified, it will only get power supplies that are
         children of the the parent.  The power supplies
         will also be added as children to the parent Node.
 
-        The Powersupply object is derived mostly from the APIC 'eqptPsu' class.
+        The Powersupply object is derived mostly from the Switch 'eqptPsu' class.
 
-        :param session: APIC session
+        :param session: Switch session
         :param parent: optional parent switch of class Node
 
         :returns: list of powersupplies
@@ -678,7 +554,7 @@ class Powersupply(BaseNXPhysModule):
     def _populate_from_attributes(self, attributes):
         """Fills in an object with the desired attributes.
            Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
+           when getting objects from the Switch.
         """
         self.serial = str(attributes['ser'])
         self.model = str(attributes['model'])
@@ -732,21 +608,17 @@ class Node(BaseNXPhysObject):
 
     def __init__(self, name=None, role=None):
         """
-            :param pod: String representation of the pod number
-            :param node: String representation of the node number
-            :param name: Name of the node
-            :param role: Role of the node.  Valid roles are None,
-                         'spine', 'leaf', 'controller', 'loosenode'
-            :param parent: Parent pod object of the node.
-            """
+        :param name: Name of the node
+        :param parent: Parent pod object of the node.
+        """
         if name:
             if not isinstance(name, str):
                 raise TypeError("Name must be a string")
 
         valid_roles = [None, 'spine', 'leaf', 'controller', 'vleaf', 'vip', 'protection-chain', 'unsupported']
         if role not in valid_roles:
-            raise ValueError(
-                "role must be one of " + str(valid_roles) + " instead found " + str(role) + ' for node ' + node)
+            raise ValueError
+
         self.role = role
         self._session = None
         self.fabricSt = None
@@ -803,7 +675,7 @@ class Node(BaseNXPhysObject):
         If they don't have children, this will return an empty list.
         :return: list of classes
         """
-        return [Systemcontroller, Supervisorcard, Linecard, Powersupply, Fantray]
+        return [Supervisorcard, Linecard, Powersupply, Fantray]
 
     @staticmethod
     def _get_children_concrete_classes():
@@ -853,74 +725,15 @@ class Node(BaseNXPhysObject):
 
     @classmethod
     def get(cls, session):
-        """Gets all of the Nodes from the APIC.  If the parent pod is specified,
-        only nodes of that pod will be retrieved.
-
-        If parent pod and node_id is specified, only the matching switch will be
-        retrieved.
-
-        APIC controller nodes will have a 'role' of 'controller', while
-        switch nodes will have a 'role' of 'leaf' or 'spine'
-
-        :param session: APIC session
-        :param parent: optional parent object or pod_id
-        :param node_id: optional node_id of switch
-
+        """
+        TODO: Currently not implemented fully
+        :param session: Switch session
         :returns: list of Nodes
         """
         # need to add pod as parent
         cls.check_session(session)
 
         return Node
-        base_url = '/api/mo/' + '.json?'
-        working_data = WorkingData(session, Node, base_url)
-
-        nodes = []
-        data = working_data.get_class('fabricNode')
-        for switch_node in data:
-            if 'fabricNode' in switch_node:
-                dist_name = str(switch_node['fabricNode']['attributes']['dn'])
-                node_name = str(switch_node['fabricNode']['attributes']['name'])
-                (pod, node_id) = cls._parse_dn(dist_name)
-                node_role = str(switch_node['fabricNode']['attributes']['role'])
-                node = cls(pod, node_id, node_name, node_role)
-                node._session = session
-                node._populate_from_attributes(switch_node['fabricNode']['attributes'])
-                node._get_topsystem_info(working_data)
-
-                # check for pod match if specified
-                pod_match = False
-                if parent:
-                    if isinstance(parent, Pod):
-                        if node.pod == parent.pod:
-                            pod_match = True
-                            node._parent = parent
-                    else:
-                        # pod is a number string
-                        if node.pod == parent:
-                            pod_match = True
-                else:
-                    pod_match = True
-
-                # check for node match if specified
-                node_match = False
-                if node_id:
-                    if node_id == node.node:
-                        node_match = True
-                else:
-                    node_match = True
-
-                if node_match and pod_match:
-                    if node.role == 'leaf':
-                        node._add_vpc_info(working_data)
-                    node.get_health()
-                    node.get_firmware(working_data)
-
-                    if isinstance(parent, Pod):
-                        node._parent.add_child(node)
-
-                    nodes.append(node)
-        return nodes
 
     def get_firmware(self, working_data):
         """
@@ -1248,13 +1061,13 @@ class Node(BaseNXPhysObject):
 class ExternalSwitch(BaseNXPhysObject):
     """External Node.  This class is for switch nodes that are
     connected to the pod, but are not
-    NX nodes, i.e. are not under control of the APIC.
+    NX nodes, i.e. are not under control of the Switch.
     Examples would be external layer 2 switches,
     external routers, or hypervisor based switches.
 
     This class will look as much as possible like the Node
     class recognizing that not as much information
-    is available to the APIC about them as is available
+    is available to the Switch about them as is available
     about NX nodes.  Nearly all of the information used
     to create this class comes from LLDP.
     """
@@ -1292,7 +1105,7 @@ class ExternalSwitch(BaseNXPhysObject):
 
         :returns: class of parent object
         """
-        return Pod
+        raise NotImplementedError
 
     @classmethod
     def _get_switch_classes(cls):
@@ -1404,9 +1217,9 @@ class ExternalSwitch(BaseNXPhysObject):
 
     @classmethod
     def get(cls, session, parent=None):
-        """Gets all of the loose nodes from the APIC.
+        """Gets all of the loose nodes from the Switch.
 
-        :param session: APIC session
+        :param session: Switch session
         :param parent: optional parent object of type Topology
         :returns: list of ENodes
         """
@@ -1502,13 +1315,13 @@ class ExternalSwitch(BaseNXPhysObject):
 
 
 class Link(BaseNXPhysObject):
-    """Link class, equivalent to the fabricLink object in APIC"""
+    """Link class, equivalent to the fabricLink object in Switch"""
 
     def __init__(self, parent=None):
         """
             :param parent: optional parent object
 
-            """
+        """
         super(Link, self).__init__(parent=parent)
         self.node1 = None
         self.slot1 = None
@@ -1538,14 +1351,14 @@ class Link(BaseNXPhysObject):
 
         :returns: class of parent object
         """
-        return Pod
+        raise NotImplementedError
 
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['fabricLink']
 
@@ -1553,58 +1366,14 @@ class Link(BaseNXPhysObject):
 
     @classmethod
     def get(cls, session, parent_pod=None, node_id=None):
-        """Gets all of the Links from the APIC.  If the parent_pod is specified,
-        only links of that pod will be retrieved. If the parent_pod is a Pod object
-        then the links will be added as children of that pod.
+        """
+        Currently Notimplemented
 
-        If node is specified, then only links of that originate
-        at the specific node will be returned.
-        If node is specified, pod must be specified.
-
-        :param session: APIC session
-        :param parent_pod: Optional parent Pod object or identifier string.
-        :param node_id: Optional node number string
-
+        :param session: Switch session
         :returns: list of links
         """
         cls.check_session(session)
-
-        pod_id = None
-        if parent_pod:
-            if not isinstance(parent_pod, cls._get_parent_class()) and not isinstance(parent_pod, str):
-                raise TypeError('An instance of Pod class or a pod number string is required')
-
-            if isinstance(parent_pod, Pod):
-                pod_id = parent_pod.pod
-            else:
-                pod_id = parent_pod
-
-        interface_query_url = '/api/node/class/fabricLink.json?query-target=self'
-        if not parent_pod:
-            interface_query_url = '/api/node/class/fabricLink.json?query-target=self'
-        elif pod_id:
-            if node_id:
-                interface_query_url = ('/api/node/class/fabricLink.json?'
-                                       'query-target=self&query-target-filter=eq(fabricLink.n1,"'
-                                       + node_id + '")')
-            else:
-                interface_query_url = '/api/node/class/fabricLink.json?query-target=self'
         links = []
-        ret = session.get(interface_query_url)
-        link_data = ret.json()['imdata']
-        for switch_link in link_data:
-            if 'fabricLink' in switch_link:
-                link = Link()
-                link._session = session
-                link._populate_from_attributes(switch_link['fabricLink']['attributes'])
-                if pod_id:
-                    if link.pod == pod_id:
-                        if isinstance(parent_pod, Pod):
-                            link._parent = parent_pod
-                            link._parent.add_child(link)
-                        links.append(link)
-                else:
-                    links.append(link)
         return links
 
     def _populate_from_attributes(self, attributes):
@@ -1644,7 +1413,7 @@ class Link(BaseNXPhysObject):
         """Returns the Node object that corresponds to the first
         node of the link.  The Node must be a child of
         the Pod that this link is a member of, i.e. it
-        must already have been read from the APIC.  This can
+        must already have been read from the Switch.  This can
         most easily be done by populating the entire
         physical heirarchy from the Pod down.
 
@@ -1663,7 +1432,7 @@ class Link(BaseNXPhysObject):
         """Returns the Node object that corresponds to the
         second node of the link.  The Node must be a child of
         the Pod that this link is a member of, i.e. it must
-        already have been read from the APIC.  This can
+        already have been read from the Switch.  This can
         most easily be done by populating the entire physical
         heirarchy from the Pod down.
 
@@ -1683,7 +1452,7 @@ class Link(BaseNXPhysObject):
         """Returns the Linecard object that corresponds to the
         first slot of the link.  The Linecard must be a child of
         the Node in the Pod that this link is a member of,
-        i.e. it must already have been read from the APIC.  This can
+        i.e. it must already have been read from the Switch.  This can
         most easily be done by populating the entire physical
         heirarchy from the Pod down.
 
@@ -1704,7 +1473,7 @@ class Link(BaseNXPhysObject):
         """Returns the Linecard object that corresponds to the
          second slot of the link.  The Linecard must be a child of
         the Node in the Pod that this link is a member of,
-        i.e. it must already have been read from the APIC.  This can
+        i.e. it must already have been read from the Switch.  This can
         most easily be done by populating the entire physical
         heirarchy from the Pod down.
 
@@ -1725,7 +1494,7 @@ class Link(BaseNXPhysObject):
         """Returns the Linecard object that corresponds to the
         first port of the link.  The port must be a child of
         the Linecard in the Node in the Pod that this link is a
-        member of, i.e. it must already have been read from the APIC.  This can
+        member of, i.e. it must already have been read from the Switch.  This can
         most easily be done by populating the entire physical
         heirarchy from the Pod down.
 
@@ -1747,7 +1516,7 @@ class Link(BaseNXPhysObject):
         Returns the Linecard object that corresponds to the second port of
         the link. The port must be a child of the Linecard in the Node in
         the Pod that this link is a member of, i.e. it must already have been
-        read from the APIC.  This can most easily be done by populating the
+        read from the Switch.  This can most easily be done by populating the
         entire physical heirarchy from the Pod down.
 
         :returns: Interface object at second end of link
@@ -1800,38 +1569,133 @@ class Interface(BaseInterface):
     """This class defines a physical interface.
     """
 
-    def __init__(self, interface_type, module, port,
-                 parent=None, session=None, attributes=None):
+    def __init__(self, if_name, parent=None, session=None, attributes=None):
 
         self._session = session
         if attributes is None:
             self.attributes = {}
         else:
             self.attributes = copy.deepcopy(attributes)
-        self.interface_type = str(interface_type)
-        self.module = str(module)
-        self.port = str(port)
-        self.attributes['interface_type'] = str(interface_type)
-        self.attributes['module'] = str(module)
-        self.attributes['port'] = str(port)
+            
+        if 'eth' in if_name:
+            self.interface_type = 'eth'
+            self.attributes['interface_type'] = self.interface_type
+            self.id = if_name
+            self.if_type = if_name[:3]
+            (self.module, self.port)= if_name.replace('eth', '').split('/')
+            self.if_name = if_name
+            self.attributes['module'] = self.module
+            self.attributes['port'] = self.port
+            self.attributes['if_name'] = self.if_name
+        else:
+            raise TypeError ('ethernet interface expected')
 
-        self.if_name = self.interface_type + self.module + '/' + self.port
-        self.attributes['if_name'] = self.if_name
-        super(Interface, self).__init__(self.if_name, None)
+        super(Interface, self).__init__(if_name, None)
         self.porttype = ''
-        self.adminstatus = ''  # up or down
-        self.speed = '10G'  # 100M, 1G, 10G or 40G
-        self.mtu = ''
         self._cdp_config = None
         self._lldp_config = None
         self.type = 'interface'
         self.attributes['type'] = 'interface'
-        self.id = interface_type + module + '/' + port
+        
+        self._layer = None  # Layer2 or Layer3
+        self._mode = 'access' # access, trunk, fex-fabric
+        self._snmp_trap_st = 'default' # enable/disable/default
+        self._adminstatus = None  # up or down
+        self._speed = '10G'  # 100M, 1G, 10G or 40G
+        self._mtu = '1500'
+        self._link_log = 'default' # enable/disable/default
+        self._trunk_log = 'default' #enable/disable/default
+        self._duplex = 'auto' # auto/half/full
+        self._access_vlan = None
+        self._trunk_vlans = None
+        self._native_vlan = None
+        self._descr = ''
+        
+        self.object = 'l1PhysIf'
 
         self._parent = parent
         if parent:
             self._parent.add_child(self)
+
         self.stats = InterfaceStats(self, self.attributes.get('dist_name'))
+        
+    def set_descr(self, desc):
+        self._descr = desc
+    
+    def get_descr(self):
+        return self._descr
+       
+    def set_mode(self, mode):
+        self._mode = mode
+    
+    def get_mode(self):
+        return self._mode
+    
+    def set_layer(self, layer):
+        if layer not in ['Layer2', 'Layer3']:
+            raise TypeError ('Not a valid layer')
+        self._layer = layer
+        
+    def get_layer(self):
+        return self._layer
+    
+    def set_snmp_status(self, status):
+        self._snmp_trap_st = status
+    
+    def get_snmp_status(self):
+        return self._snmp_trap_st
+    
+    def set_admin_status(self, status):
+        self._adminstatus = status
+    
+    def get_admin_status(self):
+        return self._adminstatus
+
+    def set_speed(self, speed=None):
+        self._speed = speed
+    
+    def get_speed(self):
+        return self._speed
+    
+    def set_mtu(self, mtu=None):
+        self._mtu = mtu
+        
+    def get_mtu(self):
+        return self._mtu
+    
+    def set_link_log(self, linklog=None):
+        self._link_log = linklog
+    
+    def get_link_log(self):
+        return self._link_log
+    
+    def set_trunk_log(self, trunklog=None):
+        self._trunk_log = trunklog
+    
+    def get_trunk_log(self):
+        return self._trunk_log
+    
+    def set_duplex(self, duplex=None):
+        self._duplex = duplex
+    
+    def get_duplex(self):
+        return self._duplex
+    
+    def set_access_vlan(self, access=None):
+        """Set access and trunk vlans for the interface"""
+        self._access_vlan = access
+    
+    def get_access_vlan(self):
+        return self._access_vlan
+    
+    def set_native_vlan(self, trunk):
+        """ Set native vlan"""
+        # TODO this feature is not Implemented,
+        # currently it is not supported
+        raise NotImplementedError
+    
+    def get_native_vlan(self):
+        return self._native_vlan
 
     def is_interface(self):
         """
@@ -1913,124 +1777,68 @@ class Interface(BaseInterface):
         :return: None
         """
         return None
+     
+    def _get_attributes(self):
+        """
+        :return All the attributes of the switch to be configured
+        """
+        att = {}
+        if self._access_vlan:
+            att['accessVlan'] = self._access_vlan
+        if self._trunk_vlans:
+            att['trunkVlans'] = self._trunk_vlans
+        if self._mtu:
+            att['mtu'] = self._mtu
+        if self._adminstatus:
+            att['adminSt'] = self._adminstatus
+        if self._speed:
+            att['speed'] = self._speed
+        if self._layer:        
+            att['layer'] = self._layer
+        if self._snmp_trap_st:
+            att['snmpTrapSt'] = self._snmp_trap_st
+        if self._descr:
+            att['descr'] = self._descr
+        if self._duplex:
+            att['duplex'] = self._duplex
+        if self._mode:
+            att['mode'] = self._mode
+        if self._link_log:
+            att['linkLog'] = self._link_log
+        if self._trunk_log:
+            att['trunkLog'] = self._trunk_log
 
-    @staticmethod
-    def get_url():
+        att['id'] = self.id
+
+        return att
+
+    def get_url(self, fmt='json'):
         """
         Gets URLs for physical domain, fabric, and infra.
 
-        :return:
+        :return: string: URL to configure interface
         """
-        phys_domain_url = '/api/mo/uni.json'
-        fabric_url = '/api/mo/uni/fabric.json'
-        infra_url = '/api/mo/uni.json'
-        return phys_domain_url, fabric_url, infra_url
+        return '/api/mo/' + self._get_path() + '.' + fmt
 
     def _get_name_for_json(self):
         return '%s-%s-%s-%s' % (self.pod, self.node,
                                 self.module, self.port)
 
     def get_json(self):
-        """ Get the json for an interface.  Returns a tuple since the json is
-            required to be sent in 2 posts.
+        """ Get the json for an interface
         """
-        fabric = None
-        # Physical Domain json
-        vlan_ns_dn = 'uni/infra/vlanns-allvlans-static'
-        vlan_ns_ref = {'infraRsVlanNs': {'attributes':
-                                             {'tDn': vlan_ns_dn},
-                                         'children': []}}
-        phys_domain = {'physDomP': {'attributes': {'name': 'allvlans'},
-                                    'children': [vlan_ns_ref]}}
-
-        # Infra json
-        infra = {'infraInfra': {'children': []}}
-        node_profile, accport_selector = self.get_port_selector_json()
-        infra['infraInfra']['children'].append(node_profile)
-        infra['infraInfra']['children'].append(accport_selector)
-        speed_name = 'speed%s' % self.speed
-        hifpol_dn = 'uni/infra/hintfpol-%s' % speed_name
-        speed = {'fabricHIfPol': {'attributes': {'autoNeg': 'on',
-                                                 'dn': hifpol_dn,
-                                                 'name': speed_name,
-                                                 'speed': self.speed},
-                                  'children': []}}
-        infra['infraInfra']['children'].append(speed)
-        name = self._get_name_for_json()
-        accportgrp_dn = 'uni/infra/funcprof/accportgrp-%s' % name
-        speed_attr = {'tnFabricHIfPolName': speed_name}
-        speed_children = {'infraRsHIfPol': {'attributes': speed_attr,
-                                            'children': []}}
-        cdp_children = None
-        if self._cdp_config is not None:
-            cdp_data = {'tnCdpIfPolName': 'CDP_%s' % self._cdp_config}
-            cdp_children = {'infraRsCdpIfPol': {'attributes': cdp_data}}
-        lldp_children = None
-        if self._lldp_config is not None:
-            lldp_data = {'tnLldpIfPolName': 'LLDP_%s' % self._lldp_config}
-            lldp_children = {'infraRsLldpIfPol': {'attributes': lldp_data}}
-        att_ent_dn = 'uni/infra/attentp-allvlans'
-        att_ent_p = {'infraRsAttEntP': {'attributes': {'tDn': att_ent_dn},
-                                        'children': []}}
-        speed_ref = {'infraAccPortGrp': {'attributes': {'dn': accportgrp_dn,
-                                                        'name': name},
-                                         'children': [speed_children,
-                                                      att_ent_p]}}
-        if cdp_children is not None:
-            speed_ref['infraAccPortGrp']['children'].append(cdp_children)
-        if lldp_children is not None:
-            speed_ref['infraAccPortGrp']['children'].append(lldp_children)
-        speed_ref = {'infraFuncP': {'attributes': {}, 'children': [speed_ref]}}
-        infra['infraInfra']['children'].append(speed_ref)
-
-        phys_dom_dn = 'uni/phys-allvlans'
-        rs_dom_p = {'infraRsDomP': {'attributes': {'tDn': phys_dom_dn}}}
-        infra_att_entity_p = {'infraAttEntityP': {'attributes':
-                                                      {'name': 'allvlans'},
-                                                  'children': [rs_dom_p]}}
-        infra['infraInfra']['children'].append(infra_att_entity_p)
-
-        if self._cdp_config is not None:
-            cdp_if_pol = {'cdpIfPol': {'attributes': {'adminSt': self._cdp_config,
-                                                      'name': 'CDP_%s' % self._cdp_config}}}
-            infra['infraInfra']['children'].append(cdp_if_pol)
-
-        if self._lldp_config is not None:
-            lldp_if_pol = {'lldpIfPol': {'attributes': {'adminRxSt': self._lldp_config,
-                                                        'adminTxSt': self._lldp_config,
-                                                        'name': 'LLDP_%s' % self._lldp_config}}}
-            infra['infraInfra']['children'].append(lldp_if_pol)
-
-        if self.adminstatus != '':
-            adminstatus_attributes = {'tDn': self._get_path()}
-            if self.adminstatus == 'up':
-                admin_dn = 'uni/fabric/outofsvc/rsoosPath-['
-                admin_dn = admin_dn + self._get_path() + ']'
-                adminstatus_attributes['dn'] = admin_dn
-                adminstatus_attributes['status'] = 'deleted'
-            else:
-                adminstatus_attributes['lc'] = 'blacklist'
-            adminstatus_json = {'fabricRsOosPath':
-                                    {'attributes': adminstatus_attributes,
-                                     'children': []}}
-            fabric = {'fabricOOServicePol': {'children': [adminstatus_json]}}
-
-        fvns_encap_blk = {'fvnsEncapBlk': {'attributes': {'name': 'encap',
-                                                          'from': 'vlan-1',
-                                                          'to': 'vlan-4092'}}}
-        fvns_vlan_inst_p = {'fvnsVlanInstP': {'attributes':
-                                                  {'name': 'allvlans',
-                                                   'allocMode': 'static'},
-                                              'children': [fvns_encap_blk]}}
-        infra['infraInfra']['children'].append(fvns_vlan_inst_p)
-
-        return phys_domain, fabric, infra
-
+        resp =  super(Interface, self).get_json(self.object,
+                                        attributes=self._get_attributes())
+        if self._native_vlan:
+            # TODO need to find parameter for native vlan
+            pass
+        return resp
+        
     def _get_path(self):
         """Get the path of this interface used when communicating with
-           the APIC object model.
+           the Switch object model.
         """
-        return 'sys/phys-[eth%s/%s]' % (self.module, self.port)
+        return 'sys/intf/phys-[eth%s/%s]' % (self.module, self.port)
 
     @staticmethod
     def parse_name(name):
@@ -2048,12 +1856,13 @@ class Interface(BaseInterface):
         """
         Handles DNs that look like the following:
         sys/phys-[eth1/1]
+        sys/intf/phys-[eth1/1] (For Image .551) 
         """
         name = dn.split('/')
-        module = name[1].split('[')[1]
+        module = name[2].split('[')[1]
         interface_type = module[:3]
         module = module[3:]
-        port = name[2].split(']')[0]
+        port = name[3].split(']')[0]
 
         return interface_type, module, port
 
@@ -2132,7 +1941,10 @@ class Interface(BaseInterface):
                 attributes = prot_relation[prot_relation_class]['attributes']
                 policy_name = attributes['tDn'].split(prot_relation_dn_class)[1]
                 intf_dn = attributes['dn'].split(prot_relation_dn)[0]
-                search_intf = Interface(*Interface._parse_physical_dn(intf_dn))
+                #TODO search_intf = Interface(*Interface._parse_physical_dn(intf_dn))
+                (if_type, module, port) = Interface._parse_physical_dn(intf_dn)
+                if_name = if_type + module + '/' + port
+                search_intf = Interface(if_name)
                 for intf in interfaces:
                     if intf == search_intf:
                         if prot_policies[policy_name] == 'enabled':
@@ -2162,9 +1974,9 @@ class Interface(BaseInterface):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['l1PhysIf', 'ethpmPhysIf', 'l1RsCdpIfPolCons', 'l1RsLldpIfPolCons',
                 'cdpIfPol', 'lldpIfPol']
@@ -2172,9 +1984,9 @@ class Interface(BaseInterface):
         return resp
 
     @classmethod
-    def get(cls, session, module=None, port=None):
+    def get(cls, session, if_name=None):
         """
-        Gets all of the physical interfaces from the APIC if no parent is
+        Gets all of the physical interfaces from the Switch if no parent is
         specified. If a parent of type Linecard is specified, then only
         those interfaces on that linecard are returned and they are also
         added as children to that linecard.
@@ -2182,7 +1994,7 @@ class Interface(BaseInterface):
         If the pod, node, module and port are specified, then only that
         specific interface is read.
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param pod_parent: Linecard instance to limit interfaces or pod\
                            number (optional)
         :param node: Node id string.  This specifies the switch to read.\
@@ -2195,20 +2007,22 @@ class Interface(BaseInterface):
         """
         if not isinstance(session, Session):
             raise TypeError('An instance of Session class is required')
+        
 
-        if port:
-            if not isinstance(port, str):
+        #if port:
+        if if_name:
+            #if not isinstance(port, str):
+            if not isinstance(if_name, str):
                 raise TypeError('When specifying a specific port, the port'
                                 ' must be a identified by a string')
-            if not isinstance(module, str):
-                raise TypeError(('When specifying a specific port, the module'
-                                 ' must be identified by a string'))
 
         cdp_policies = Interface._get_discoveryprot_policies(session, 'cdp')
         lldp_policies = Interface._get_discoveryprot_policies(session, 'lldp')
 
-        if port:
-            dist_name = 'sys/phys-[eth{0}/{1}]'.format(module, port)
+        if if_name:
+            dist_name = 'sys/intf/phys-[{0}]'.format(if_name)
+            # Below dist_name should be used if image version is below .541
+            # dist_name = 'sys/phys-[{0}]'.format(if_name)
             interface_query_url = ('/api/mo/' + dist_name + '.json?query-target=self')
             eth_query_url = ('/api/mo/' + dist_name + '/phys.json?query-target=self')
         else:
@@ -2247,6 +2061,7 @@ class Interface(BaseInterface):
                 attributes['name'] = str(interface['l1PhysIf']['attributes']['name'])
                 attributes['descr'] = str(interface['l1PhysIf']['attributes']['descr'])
                 attributes['usage'] = str(interface['l1PhysIf']['attributes']['usage'])
+                attributes['layer'] = str(interface['l1PhysIf']['attributes']['layer'])
                 (interface_type, module, port) = Interface.parse_dn(dist_name)
                 attributes['interface_type'] = interface_type
                 attributes['module'] = module
@@ -2256,13 +2071,19 @@ class Interface(BaseInterface):
                     attributes['operSt'] = eth_data_dict[dist_name + '/phys']['operSt']
                 else:
                     attributes['operSt'] = ''
-                interface_obj = Interface(interface_type, module, port,
-                                          parent=None, session=session,
+                
+                interface_obj = Interface(identifier, parent=None, session=session,
                                           attributes=attributes)
+                
+                
                 interface_obj.porttype = porttype
                 interface_obj.adminstatus = adminstatus
                 interface_obj.speed = speed
                 interface_obj.mtu = mtu
+                if attributes['operSt']:
+                    interface_obj.operSt = attributes['operSt']
+                else:
+                    interface_obj.operSt = '-'
 
                 resp.append(interface_obj)
 
@@ -2285,27 +2106,6 @@ class Interface(BaseInterface):
                     self.attributes['port'] == other.attributes.get('port')):
             return True
         return False
-
-    def get_adjacent_port(self):
-        """
-        This will return the port ID of the port at the other end of the link.
-
-        For Access ports, it will only have a result if it is connected to
-        a controller node.
-
-        If no link is found, then the result will be None.  That does not mean
-        that nothing is connected, just that a fabric link is not connected.
-
-        :returns : Port ID string
-        """
-        result = None
-
-        links = Link.get(self._session, '1', self.attributes['node'])
-        for link in links:
-            if link.port1 == self.attributes['port']:
-                return link.get_port_id2()
-        return result
-
 
 
 class WorkingData(object):
@@ -2377,7 +2177,7 @@ class WorkingData(object):
                     if switch_class not in self.by_class:
                         self.by_class[switch_class] = []
 
-                    # fix apparent bug in APIC where multiple nodes are returned for the APIC node
+                    # fix apparent bug in Switch where multiple nodes are returned for the Switch node
                     if switch_class == 'fabricNode':
                         if item[switch_class]['attributes']['role'] in ['leaf', 'spine']:
                             self.by_class[switch_class].append(item)
@@ -2494,7 +2294,7 @@ class WorkingData(object):
 
 class Process(BaseNXPhysObject):
     """
-    Class to hold information about a process running on a node - either switch or controller
+    Class to hold information about a process running on a Switch
     """
 
     def __init__(self):
@@ -2530,8 +2330,9 @@ class Process(BaseNXPhysObject):
 
         result = []
 
-        node_query_url = '/api/mo/' + 'sys/procsys.json?query-target=children&rsp-subtree-include=stats' \
-                                                '&rsp-subtree-class=statsCurr'
+        node_query_url = ('/api/mo/sys/procsys.json?query-target=children&'
+                          'rsp-subtree-include=stats&rsp-subtree-class='
+                          'statsCurr')
 
         ret = session.get(node_query_url)
         processes = ret.json()['imdata']
@@ -2540,10 +2341,6 @@ class Process(BaseNXPhysObject):
                 process = Process()
                 process._populate_from_attributes(child['procProc']['attributes'])
                 process._populate_stats(child['procProc']['children'])
-
-                if parent:
-                    process._parent = parent
-                    process._parent.add_child(process)
                 result.append(process)
         return result
 
@@ -2643,7 +2440,7 @@ class PhysicalModel(BaseNXObject):
             assert isinstance(session, Session)
 
         if parent:
-            assert isinstance(parent, Fabric)
+            assert isinstance(parent, System)
 
         super(PhysicalModel, self).__init__(name='', parent=parent)
 
@@ -2679,18 +2476,22 @@ class System(BaseNXObject):
     From this class, you can populate all of the children classes.
     """
 
-    def __init__(self, session=None):
+    def __init__(self, session=None, name=None):
         """
         Initialization method that sets up the Fabric.
         :return:
         """
         if session:
             assert isinstance(session, Session)
+        if not name:
+            name = ''
+        super(System, self).__init__(name=name, parent=None)
 
-        super(Fabric, self).__init__(name='', parent=None)
-
-        self.session = session
-
+        self._session = session
+   
+    def get_url(self, fmt='json'):
+        return '/api/mo/sys.' + fmt
+    
     @staticmethod
     def _get_children_classes():
         """
@@ -2701,4 +2502,109 @@ class System(BaseNXObject):
         """
         return [PhysicalModel, NX.LogicalModel]
 
+    @classmethod
+    def get(cls, session=None):
+        """ Get System info
+        
+        :param Session object co communicate with switch
+        :reutrn System object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        query_url = '/api/mo/sys.json'
+        resp = session.get(query_url).json()['imdata']
+        for system in resp:
+            dev_name = str(system['topSystem']['attributes']['name'])
+            print dev_name
+            return System(session=session, name=dev_name)
 
+
+class Ethpm(BaseNXObject):
+    """
+    This class defines ethpm
+    """
+    
+    def __init__(self, name=None, session=None, ):
+        
+        if not name:
+            name = ''
+        super(Ethpm, self).__init__(name=name)
+        
+        self._session = session
+        self.unsuported_sft = None
+        self.default_admin_st = None
+        self.default_layer = None
+        self.jumbo_mtu = None
+        self.object = 'ethpmInst'
+    
+    def set_unsupported_transceiver(self, supp_sft=None):
+        self.unsuported_sft = supp_sft
+    
+    def get_unsupported_transceiver(self):
+        return self.unsuported_sft
+    
+    def set_default_admin_st(self, admin_st=None):
+        self.default_admin_st = admin_st
+    
+    def get_default_admin_st(self):
+        return self.default_admin_st
+    
+    def set_default_layer(self, layer=None):
+        self.default_layer = layer
+    
+    def get_default_layer(self):
+        return self.default_layer
+    
+    def set_jumbomtu(self, mtu=None):
+        self.jumbo_mtu = mtu
+    
+    def get_jumbomtu(self):
+        return self.jumbo_mtu
+    
+    def _get_attributes(self):
+        att = {}
+        if self.unsuported_sft:
+            att['allowUnsupportedSfp'] = self.unsuported_sft
+        if self.default_admin_st:
+            att['systemDefaultAdminSt'] = self.default_admin_st
+        if self.default_layer:
+            att['systemDefaultLayer'] = self.default_layer
+        if self.jumbo_mtu:
+            att['systemJumboMtu'] = self.jumbo_mtu
+        return att
+
+    def get_json(self):
+        att = self._get_attributes()
+        return super(Ethpm, self).get_json(self.object, attributes=att)
+    
+    def get_url(self, fmt='json'):
+        return '/api/mo/sys/ethpm/inst.' + fmt
+    
+    @classmethod
+    def get(self, session=None):
+        """
+        Get ethpm details
+        :param session: A Session instance to communicate with Switch
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        query_url = '/api/mo/sys/ethpm/inst.json'
+        
+        ethpms = session.get(query_url).json()['imdata']
+        for ethpm in ethpms:
+            
+            ethpm_obj = Ethpm(session=session)
+            
+            adminst = str(ethpm['ethpmInst']['attributes']['systemDefaultAdminSt'])
+            layer = str(ethpm['ethpmInst']['attributes']['systemDefaultLayer'])
+            mtu = str(ethpm['ethpmInst']['attributes']['systemJumboMtu'])
+            sfp = str(ethpm['ethpmInst']['attributes']['allowUnsupportedSfp'])
+            
+            ethpm_obj.set_default_admin_st(admin_st=adminst)
+            ethpm_obj.set_default_layer(layer=layer)
+            ethpm_obj.set_jumbomtu(mtu=mtu)
+            ethpm_obj.set_unsupported_transceiver(supp_sft=sfp)
+            
+            return ethpm_obj

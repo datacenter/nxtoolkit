@@ -14,7 +14,7 @@
 #    under the License.
 #
 """  This module contains code that emulates the Session class except that
-     there is no actual APIC and the configuration comes from JSON files.
+     there is no actual Switch and the configuration comes from JSON files.
 """
 import json
 from nxsession import Session
@@ -61,11 +61,11 @@ class FakeSubscriber(object):
 
 class FakeSession(Session):
     """
-    Class to fake an APIC Session
+    Class to fake a Switch Session
     """
     def __init__(self, filenames=[]):
         """
-        Create a fake APIC session based off of the supplied JSON files
+        Create a fake Switch session based off of the supplied JSON files
         :param filenames: list of filenames containing the JSON configuration
         :return: None
         """
@@ -85,7 +85,7 @@ class FakeSession(Session):
         """
         Recursively search the configuration for the specified class instances
 
-        :param class_name: APIC class to search the config
+        :param class_name: Switch class to search the config
         :param resp: list of found configuration
         :param db: JSON configuration to search
         :param with_children: True or False.  True if the response should
@@ -219,8 +219,8 @@ class FakeSession(Session):
                     
     def login(self, timeout=None):
         """
-        Initiate login to the APIC.  Opens a communication session with the\
-        APIC using the python requests library.
+        Initiate login to the Switch.  Opens a communication session with the\
+        Switch using the python requests library.
 
         :returns: Response class instance from the requests library.\
         response.ok is True if login is successful.
@@ -267,14 +267,14 @@ class FakeSession(Session):
         """
         pass
 
-    def push_to_apic(self, url, data):
+    def push_to_switch(self, url, data):
         """
-        Push the object data to the APIC
+        Push the object data to the Switch
 
         :param url: String containing the URL that will be used to\
-                    send the object data to the APIC.
+                    send the object data to the Switch.
         :param data: Dictionary containing the JSON objects to be sent\
-                     to the APIC.
+                     to the Switch.
         :returns: Response class instance from the requests library.\
                   response.ok is True if request is sent successfully.
         """
@@ -283,13 +283,13 @@ class FakeSession(Session):
 
     def get(self, url):
         """
-        Perform a REST GET call to the APIC.
+        Perform a REST GET call to the Switch.
 
-        :param url: String containing the URL that will be used to\
-        send the object data to the APIC.
-        :returns: Response class instance from the requests library.\
-        response.ok is True if request is sent successfully.\
-        response.json() will return the JSON data sent back by the APIC.
+        :param url: String containing the URL that will be used to
+        send the object data to the Switch.
+        :returns: Response class instance from the requests library.
+        response.ok is True if request is sent successfully.
+        response.json() will return the JSON data sent back by the Switch.
         """
         resp = FakeResponse(self._get_config(url))
         return resp

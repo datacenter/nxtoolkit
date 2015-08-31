@@ -18,8 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and displays all
-of the vlans.
+Simple application that logs on to the Switch and configure interface breakout.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -33,8 +32,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = '''Simple application that logs on to the Switch
-                    and displays all of the vlans.'''
+    description = '''Simple application that logs on to the Switch and 
+            configure interface breakout.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -45,29 +44,54 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
 
-    # Download all of the interfaces
-    # and store the data as tuples in a list
-    data = []
-    l2BDs = NX.L2BD.get(session)
-    for l2BD in l2BDs:
-        data.append((l2BD.id,
-                          l2BD.bridgeMode,
-                          l2BD.adminSt,
-                          l2BD.operSt,
-                          l2BD.unkMacUcastAct,
-                          l2BD.unkMcastAct))
+    brkout = NX.InterfaceBreakout()
+    
+    module1 = NX.BreakoutModule('1')
+    module1.add_port_map('1', '10g-4x')
+    module1.add_port_map('2', '10g-4x')
+    
+    module2 = NX.BreakoutModule('2')
+    module2.add_port_map('1', '10g-4x')
+    
+    brkout.add_module(module1)
+    brkout.add_module(module2)
 
-    data = sorted(data)
+    resp = session.push_to_switch(brkout.get_url(), brkout.get_json())
+    if not resp.ok:
+        print('%% Could not configure the Switch')
+        sys.exit(0)
 
-    # Display the data downloaded
-    template = "{0:5} {1:12} {2:^11} {3:^10} {4:9} {5:8}"
-    print(template.format("ID", "Bridge Mode", "ADMIN STATE", "OPER STATE",
-                          "UNK UCAST", "UNK MCAST"))
-    print(template.format("----", "------------", "-----------", "----------",
-                          "---------", "--------"))
-    for rec in data:
-        print(template.format(*rec))
+    # Display all the data
+    brk = NX.InterfaceBreakout.get(session)
+    
+    # Get list of BreakoutModule object
+    modules = brk.modules.get()
+    for module in modules:
+        print "Module %s:\n========" % (module.module_num)
+        # Get list of breakout ports under module
+        ports = module.ports.get() 
+        for port in ports:
+            print "Port:", port.id
+            print "Map :", port.map
+            print ""
 
+    # Uncomment below lines to delete breakout configuration for port 
+    # 1 of module 1
+    '''
+    resp = session.delete(brkout.get_delete_url(module='1', port='1'))
+    if not resp.ok:
+        print('%% Could not configure the Switch')
+        sys.exit(0)
+    '''
 
+    # Uncomment below lines to delete all the breakout module
+    '''
+    resp = session.delete(brkout.get_url())
+    if not resp.ok:
+        print('%% Could not configure the Switch')
+        sys.exit(0)
+    '''
+    
+    
 if __name__ == '__main__':
     main()

@@ -18,8 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and displays all
-of the vlans.
+Simple application that logs on to the Switch and configure SVI.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -34,7 +33,7 @@ def main():
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
     description = '''Simple application that logs on to the Switch
-                    and displays all of the vlans.'''
+                    and configure SVI.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -44,29 +43,56 @@ def main():
     if not resp.ok:
         print('%% Could not login to Switch')
         sys.exit(0)
+    
+    # Create ConfigureInterfaces to do multiple SVI configuration at a time   
+    config = NX.ConfigInterfaces()
+    
+    # Create SVI objects providing vlans
+    svi1 = NX.SVI('vlan33')
+    svi2 = NX.SVI('vlan44')
+    
+    # Add svis to the config
+    config.add_svis(svi1)
+    config.add_svis(svi2)
+    
+    print config.get_url()
+    print config.get_json()
+    
+    # Push entire configuration to the switch
+    # Note: Using svi1.get_url() and svi1.get_json() only one svi
+    # configuration can be pushed to the switch
+    resp = session.push_to_switch(config.get_url(), config.get_json())
+    if not resp.ok:
+        print ('%% Could not login to Switch')
+        print resp.text
+        sys.exit(0)
 
-    # Download all of the interfaces
-    # and store the data as tuples in a list
     data = []
-    l2BDs = NX.L2BD.get(session)
-    for l2BD in l2BDs:
-        data.append((l2BD.id,
-                          l2BD.bridgeMode,
-                          l2BD.adminSt,
-                          l2BD.operSt,
-                          l2BD.unkMacUcastAct,
-                          l2BD.unkMcastAct))
+    svis = NX.SVI.get(session)
+    for svi in svis:
+        data.append((svi.id, svi.admin_st, svi.bw, svi.mtu,
+                     svi.descr))
 
-    data = sorted(data)
-
-    # Display the data downloaded
-    template = "{0:5} {1:12} {2:^11} {3:^10} {4:9} {5:8}"
-    print(template.format("ID", "Bridge Mode", "ADMIN STATE", "OPER STATE",
-                          "UNK UCAST", "UNK MCAST"))
-    print(template.format("----", "------------", "-----------", "----------",
-                          "---------", "--------"))
+    # Display the data downloaded (Uncomment below 
+    # lines to get the configured SVI)
+    template = "{0:15} {1:15} {2:15} {3:15} {4:40}"
+    print(template.format("  ID     " , " ADMIN ", " BANDWIDTH ",
+                          " MTU   ", "  DESCR."))
+    print(template.format("---------",  "-------", "-----------",
+                          "------ ", "--------"))
     for rec in data:
         print(template.format(*rec))
+    
+    
+    # Uncomment below lines to delete the created svi
+    '''
+    for id in ['vlan10', 'vlan20']:
+        resp = session.delete(svi1.get_delete_url(id))
+        if not resp.ok:
+            print ('%% Could not login to Switch')
+            print resp.text
+            sys.exit(0)
+    '''
 
 
 if __name__ == '__main__':

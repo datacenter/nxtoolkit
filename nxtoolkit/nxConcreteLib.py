@@ -68,9 +68,9 @@ class ConcreteArp(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['arpInst', 'arpDomStatsAdj', 'arpDomStatsRx', 'arpDomStatsTx', 'arpDom', 'arpDb', 'arpAdjEp']
 
@@ -274,9 +274,9 @@ class ConcreteVpc(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['vpcEntity', 'vpcDom']
 
@@ -486,9 +486,9 @@ class ConcreteVpcIf(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['vpcIf', 'vpcRsVpcConf']
 
@@ -678,9 +678,9 @@ class ConcreteContext(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['l3Ctx', 'l3Inst']
 
@@ -718,9 +718,9 @@ class ConcreteContext(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the context object from the APIC attribute
+        This will populate the context object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['dn'] = str(attr['dn'])
         self.attr['oper_st'] = str(attr['operState'])
@@ -851,9 +851,9 @@ class ConcreteSVI(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['sviIf']
 
@@ -886,9 +886,9 @@ class ConcreteSVI(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the context object from the APIC attribute
+        This will populate the context object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['bandwidth'] = str(attr['bw'])
         self.attr['admin_st'] = str(attr['adminSt'])
@@ -998,9 +998,9 @@ class ConcreteLoopback(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['l3LbRtdIf', 'ethpmLbRtdIf']
 
@@ -1033,9 +1033,9 @@ class ConcreteLoopback(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate from the APIC attribute
+        This will populate from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['descr'] = str(attr['descr'])
         self.attr['admin_st'] = str(attr['adminSt'])
@@ -1114,9 +1114,9 @@ class ConcreteBD(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['l2BD', 'l3Ctx', 'l3Inst', 'fmcastGrp']
 
@@ -1154,9 +1154,9 @@ class ConcreteBD(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the bridge domain object from the APIC attribute
+        This will populate the bridge domain object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['dn'] = str(attr['dn'])
         self.attr['oper_st'] = str(attr['operSt'])
@@ -1352,9 +1352,9 @@ class ConcreteAccCtrlRule(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['actrlRule']
 
@@ -1395,9 +1395,9 @@ class ConcreteAccCtrlRule(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the object from the APIC attribute
+        This will populate the object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['action'] = str(attr['action'])
         self.attr['dclass'] = str(attr['dPcTag'])
@@ -1603,9 +1603,9 @@ class ConcreteFilter(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['actrlFlt']
 
@@ -1642,9 +1642,9 @@ class ConcreteFilter(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the object from the APIC attribute
+        This will populate the object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['name'] = str(attr['name'])
         self.attr['id'] = str(attr['id'])
@@ -1775,9 +1775,9 @@ class ConcreteFilterEntry(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['actrlEntry']
 
@@ -1813,9 +1813,9 @@ class ConcreteFilterEntry(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the object from the APIC attribute
+        This will populate the object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['apply_to_frag'] = str(attr['applyToFrag'])
         self.attr['arp_opcode'] = str(attr['arpOpc'])
@@ -1929,9 +1929,9 @@ class ConcreteEp(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['epmIpEp', 'epmMacEp', 'epmRsMacEpToIpEpAtt']
 
@@ -2081,9 +2081,9 @@ class ConcreteEp(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the object from the APIC attribute
+        This will populate the object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['address'] = str(attr['addr'])
         self.attr['name'] = str(attr['name'])
@@ -2319,9 +2319,9 @@ class ConcretePortChannel(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['pcAggrIf', 'ethpmAggrIf', 'pcRsMbrIfs']
 
@@ -2355,9 +2355,9 @@ class ConcretePortChannel(BaseNXPhysObject):
 
     def _populate_from_attributes(self, attr):
         """
-        This will populate the context object from the APIC attribute
+        This will populate the context object from the Switch attribute
 
-       :param attr: Attributes of the APIC object
+       :param attr: Attributes of the Switch object
         """
         self.attr['dn'] = str(attr['dn'])
         self.attr['active_ports'] = str(attr['activePorts'])
@@ -2571,9 +2571,9 @@ class ConcreteOverlay(BaseNXPhysObject):
     @classmethod
     def _get_apic_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = ['tunnelIf']
 
@@ -2617,7 +2617,7 @@ class ConcreteOverlay(BaseNXPhysObject):
         """
         This will populate the tunnel object
 
-        :param attr: Attributes of the APIC object
+        :param attr: Attributes of the Switch object
         """
         self.attr['src_tep_ip'] = str(attr['src']).split('/')[0]
         tunnel = {'dest_tep_ip': str(attr['dest']),

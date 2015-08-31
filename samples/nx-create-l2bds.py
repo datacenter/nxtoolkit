@@ -33,7 +33,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = 'Simple application that logs on to the Switch and displays all of the Interfaces.'
+    description = '''Simple application that logs on to the Switch 
+            and displays all of the Interfaces.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -50,7 +51,7 @@ def main():
     l2BDs = NX.L2BD('vlan-273', l3Inst)
 
     # Push the tenant to the Switch
-    resp = session.push_to_apic(l3Inst.get_url(l3Inst),
+    resp = session.push_to_switch(l3Inst.get_url(),
                                 l3Inst.get_json())
     if not resp.ok:
         print('%% Error: Could not push configuration to Switch')

@@ -17,7 +17,7 @@
 #                                                                              #
 ################################################################################
 """  This module contains the Session class that controls communication
-     with the APIC.
+     with the Switch.
 """
 import logging
 import json
@@ -26,7 +26,6 @@ from requests import Timeout, ConnectionError
 import threading
 import time
 from websocket import create_connection, WebSocketException
-# import websocket
 import ssl
 
 # Queue library is named "queue" in Python3
@@ -53,7 +52,7 @@ TIMEOUT_GRACE_SECONDS = 10
 
 class Login(threading.Thread):
     """
-    Login thread responsible for refreshing the APIC login before timeout.
+    Login thread responsible for refreshing the Switch login before timeout.
     """
     def __init__(self, apic):
         threading.Thread.__init__(self)
@@ -106,7 +105,7 @@ class Subscriber(threading.Thread):
     Thread responsible for event subscriptions.
     Issues subscriptions, creates the websocket, and refreshes the
     subscriptions before timer expiry.  It also reissues the
-    subscriptions when the APIC login is refreshed.
+    subscriptions when the Switch login is refreshed.
     """
     def __init__(self, apic):
         threading.Thread.__init__(self)
@@ -155,7 +154,7 @@ class Subscriber(threading.Thread):
 
     def _open_web_socket(self, use_secure=True):
         """
-        Opens the web socket connection with the APIC.
+        Opens the web socket connection with the Switch.
 
         :param use_secure: Boolean indicating whether the web socket
                            should be secure.  Default is True.
@@ -182,7 +181,7 @@ class Subscriber(threading.Thread):
     def _resubscribe(self):
         """
         Reissue the subscriptions.
-        Used to when the APIC login timeout occurs and a new subscription
+        Used to when the Switch login timeout occurs and a new subscription
         must be issued instead of simply a refresh.  Not meant to be called
         directly by end user applications.
         """
@@ -218,7 +217,7 @@ class Subscriber(threading.Thread):
 
     def subscribe(self, url):
         """
-        Subscribe to a particular APIC URL.  Used internally by the
+        Subscribe to a particular Switch URL.  Used internally by the
         Class and Instance subscriptions.
 
         :param url: URL string to send as a subscription
@@ -236,7 +235,7 @@ class Subscriber(threading.Thread):
 
     def has_events(self, url):
         """
-        Check if a particular APIC URL subscription has any events.
+        Check if a particular Switch URL subscription has any events.
         Used internally by the Class and Instance subscriptions.
 
         :param url: URL string to check for pending events
@@ -249,7 +248,7 @@ class Subscriber(threading.Thread):
 
     def get_event(self, url):
         """
-        Get an event for a particular APIC URL subscription.
+        Get an event for a particular Switch URL subscription.
         Used internally by the Class and Instance subscriptions.
 
         :param url: URL string to get pending event
@@ -261,7 +260,7 @@ class Subscriber(threading.Thread):
 
     def unsubscribe(self, url):
         """
-        Unsubscribe from a particular APIC URL.  Used internally by the
+        Unsubscribe from a particular Switch URL.  Used internally by the
         Class and Instance subscriptions.
 
         :param url: URL string to unsubscribe
@@ -282,17 +281,17 @@ class Subscriber(threading.Thread):
 class Session(object):
     """
        Session class
-       This class is responsible for all communication with the APIC.
+       This class is responsible for all communication with the Switch.
     """
     def __init__(self, url, uid, pwd, verify_ssl=False,
                  subscription_enabled=True):
         """
-        :param url:  String containing the APIC URL such as ``https://1.2.3.4``
+        :param url:  String containing the Switch URL such as ``https://1.2.3.4``
         :param uid: String containing the username that will be used as\
-        part of the  the APIC login credentials.
+        part of the  the Switch login credentials.
         :param pwd: String containing the password that will be used as\
-        part of the  the APIC login credentials.
-        :param verify_ssl:  Used only for SSL connections with the APIC.\
+        part of the  the Switch login credentials.
+        :param verify_ssl:  Used only for SSL connections with the Switch.\
         Indicates whether SSL certificates must be verified.  Possible\
         values are True and False with the default being False.
         """
@@ -316,7 +315,7 @@ class Session(object):
 
     def _send_login(self, timeout=None):
         """
-        Send the actual login request to the APIC and open the web
+        Send the actual login request to the Switch and open the web
         socket interface.
         """
         login_url = self.api + '/api/aaaLogin.json'
@@ -342,13 +341,13 @@ class Session(object):
 
     def login(self, timeout=None):
         """
-        Initiate login to the APIC.  Opens a communication session with the\
-        APIC using the python requests library.
+        Initiate login to the Switch.  Opens a communication session with the\
+        Switch using the python requests library.
 
         :returns: Response class instance from the requests library.\
         response.ok is True if login is successful.
         """
-        logging.info('Initializing connection to the APIC')
+        logging.info('Initializing connection to the Switch')
         resp = self._send_login(timeout)
         self.login_thread.daemon = True
         self.login_thread.start()
@@ -408,14 +407,14 @@ class Session(object):
         if self._subscription_enabled:
             self.subscription_thread.unsubscribe(url)
 
-    def push_to_apic(self, url, data):
+    def push_to_switch(self, url, data):
         """
-        Push the object data to the APIC
+        Push the object data to the Switch
 
         :param url: String containing the URL that will be used to\
-                    send the object data to the APIC.
+                    send the object data to the Switch.
         :param data: Dictionary containing the JSON objects to be sent\
-                     to the APIC.
+                     to the Switch.
         :returns: Response class instance from the requests library.\
                   response.ok is True if request is sent successfully.
         """
@@ -427,17 +426,64 @@ class Session(object):
 
     def get(self, url):
         """
-        Perform a REST GET call to the APIC.
+        Perform a REST GET call to the Nexus switch.
 
         :param url: String containing the URL that will be used to\
-        send the object data to the APIC.
+        send the object data to the Switch.
         :returns: Response class instance from the requests library.\
         response.ok is True if request is sent successfully.\
-        response.json() will return the JSON data sent back by the APIC.
+        response.json() will return the JSON data sent back by the Switch.
         """
         get_url = self.api + url
         logging.debug(get_url)
         resp = self.session.get(get_url, verify=self.verify_ssl)
+        logging.debug(resp)
+        logging.debug(resp.text)
+        return resp
+    
+    def post_nxapi(self, command):
+        """
+        Perform a REST POST call to the Nexus switch.
+
+        :param url: String containing the URL that will be used to\
+        send the object data to the Nexus switch.
+        :param command: string nxapi commands
+        :returns: Response class instance from the requests library.\
+        response.ok is True if request is sent successfully.\
+        response.json() will return the JSON data sent back by the Nexus switch.
+        """
+        payload={
+                 "ins_api": {
+                             "version": "1.0",
+                             "type": "cli_show",
+                             "chunk": "0",
+                             "sid": "1",
+                             "input": command,
+                             "output_format": "json"
+                            }
+                 }
+        get_url = self.api + '/ins'
+        logging.debug(get_url)
+        headers = {'content-type': 'application/json'}
+        
+        ret = self.session.post(get_url, data=json.dumps(payload), headers=headers,
+                                auth=(self.uid, self.pwd), verify=self.verify_ssl)
+        return ret
+    
+    def delete(self, url):
+        """
+        Perform a REST DELETE call to the Nexus switch.
+
+        :param url: String containing the URL that will be used to\
+        send the object data to the Nexus switch.
+        :param command: string nxapi commands
+        :returns: Response class instance from the requests library.\
+        response.ok is True if request is sent successfully.\
+        response.json() will return the JSON data sent back by the Nexus switch.
+        """
+        delete_url = self.api + url
+        logging.debug(delete_url)
+        resp = self.session.delete(delete_url, verify=self.verify_ssl)
         logging.debug(resp)
         logging.debug(resp.text)
         return resp

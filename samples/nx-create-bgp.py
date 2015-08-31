@@ -33,7 +33,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = 'Simple application that logs on to the Switch and displays all of the Interfaces.'
+    description = '''Simple application that logs on to the Switch and
+            displays all of the Interfaces.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -44,7 +45,7 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
 
-    bgpSession = NX.BGPSession("1")
+    bgpSession = NX.BGPSession("20")
 
     bgpDom= NX.BGPDomain("default")
     bgpDom.set_router_id("10.0.0.14")
@@ -81,8 +82,9 @@ def main():
     print bgpSession.get_json()
 
     # Push the bgpSession to the Switch
-    resp = session.push_to_apic(bgpSession.get_url(bgpSession),
+    resp = session.push_to_switch(bgpSession.get_url(bgpSession),
                                 bgpSession.get_json())
+    
     if not resp.ok:
         print('%% Error: Could not push configuration to Switch')
         print(resp.text)

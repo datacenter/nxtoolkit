@@ -49,7 +49,7 @@ class BaseRelation(object):
     def is_attached(self):
         """
         :returns: True or False indicating whether the relation is attached.\
-        If a relation is detached, it will be deleted from the APIC when the\
+        If a relation is detached, it will be deleted from the Switch when the\
         configuration is pushed.
         """
         return self.status == 'attached'
@@ -57,7 +57,7 @@ class BaseRelation(object):
     def is_detached(self):
         """
         :returns: True or False indicating whether the relation is detached.\
-        If a relation is detached, it will be deleted from the APIC when the\
+        If a relation is detached, it will be deleted from the Switch when the\
         configuration is pushed.
         """
         return not self.is_attached()
@@ -119,10 +119,6 @@ class BaseNXObject(NxSearch):
         self._tags = []
         self._parent = parent
         self.descr = None
-        # self.subscribe = self._instance_subscribe
-        # self.unsubscribe = self._instance_unsubscribe
-        # self.has_events = self._instance_has_events
-        # self.get_event = self._instance_get_event
         logging.debug('Creating %s %s', self.__class__.__name__, name)
         if self._parent is not None:
             if self._parent.has_child(self):
@@ -133,7 +129,7 @@ class BaseNXObject(NxSearch):
     def _get_subscription_urls(cls):
         """
         Gets the set of URLs used to subscribe to class changes
-        in the APIC.
+        in the Switch.
 
         :returns: Set of URL strings
         """
@@ -145,7 +141,7 @@ class BaseNXObject(NxSearch):
     def _get_instance_subscription_urls(self):
         """
         Gets the set of URLs used to subscribe to instance changes
-        in the APIC.
+        in the Switch.
 
         :returns: Set of URL strings
         """
@@ -154,11 +150,11 @@ class BaseNXObject(NxSearch):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by the nxtoolkit class.
+        Get the switch classes used by the nxtoolkit class.
         Meant to be overridden by inheriting classes.
         Raises exception if not overridden.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         raise NotImplementedError
 
@@ -234,8 +230,8 @@ class BaseNXObject(NxSearch):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
-        :returns: dict of APIC class names to nxtoolkit classes
+        Gets the Switch class to an nxtoolkit class mapping dictionary
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {}
 
@@ -295,7 +291,7 @@ class BaseNXObject(NxSearch):
     def remove_tag(self, tag):
         """
         Remove a particular tag from being assigned to this object.
-        Note that this does not delete the tag from the APIC.
+        Note that this does not delete the tag from the Switch.
 
         :param tag: string containing the tag to remove from this object
                     or an instance of Tag
@@ -336,7 +332,7 @@ class BaseNXObject(NxSearch):
     @classmethod
     def get_deep(cls, full_data, working_data, parent=None, limit_to=[], subtree='full', config_only=False):
         """
-        Gets all instances of this class from the APIC and gets all of the
+        Gets all instances of this class from the Switch and gets all of the
         children as well.
 
         :param full_data:
@@ -369,10 +365,10 @@ class BaseNXObject(NxSearch):
     @classmethod
     def subscribe(cls, session):
         """
-        Subscribe to events from the APIC that pertain to instances of this
+        Subscribe to events from the Switch that pertain to instances of this
         class.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         """
         urls = cls._get_subscription_urls()
         for url in urls:
@@ -389,7 +385,7 @@ class BaseNXObject(NxSearch):
         returned in the form of objects.  Objects that have been deleted
         are marked as such.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         """
         urls = cls._get_subscription_urls()
         for url in urls:
@@ -416,10 +412,10 @@ class BaseNXObject(NxSearch):
     @classmethod
     def has_events(cls, session):
         """
-        Check for pending events from the APIC that pertain to instances
+        Check for pending events from the Switch that pertain to instances
         of this class.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         :returns: True or False.  True if there are events pending.
         """
         urls = cls._get_subscription_urls()
@@ -443,9 +439,9 @@ class BaseNXObject(NxSearch):
 
     def _instance_has_events(self, session, extension=''):
         """
-        Check for pending events from the APIC that pertain to this specific instance
+        Check for pending events from the Switch that pertain to this specific instance
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         :param extension: Optional string that can be used to extend the URL
         :returns: True or False.  True if there are events pending.
         """
@@ -461,7 +457,7 @@ class BaseNXObject(NxSearch):
         returned in the form of objects.  Objects that have been deleted
         are marked as such.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         :param extension: Optional string that can be used to extend the URL
         :returns: list of objects
         """
@@ -491,10 +487,10 @@ class BaseNXObject(NxSearch):
     @classmethod
     def unsubscribe(cls, session):
         """
-        Unsubscribe for events from the APIC that pertain to instances of this
+        Unsubscribe for events from the Switch that pertain to instances of this
         class.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         """
         for class_name in cls._get_switch_classes():
             url = '/api/class/%s.json?subscription=yes' % class_name
@@ -575,7 +571,7 @@ class BaseNXObject(NxSearch):
         Detach the object from the other object.
         A relationship is either 'attached', 'detached', or does not exist.\
         A detached relationship will cause the relationship to be deleted\
-        when pushed to the APIC.
+        when pushed to the Switch.
 
         :param item:  Object to be detached.
         """
@@ -847,16 +843,16 @@ class BaseNXObject(NxSearch):
     def get_json(self, obj_class, attributes=None,
                  children=None, get_children=True):
         """
-        Get the JSON representation of this class in the actual APIC
+        Get the JSON representation of this class in the actual Switch
         Object Model.
 
-        :param obj_class:  Object Class Name within the APIC model.
+        :param obj_class:  Object Class Name within the Switch model.
         :param attributes:  Additional attributes that should be set\
                             in the JSON.
         :param children:  Children objects to traverse as well.
         :param get_children:  Indicates whether the children objects\
                               should be included.
-        :returns: JSON dictionary to be pushed to the APIC.
+        :returns: JSON dictionary to be pushed to the Switch.
         """
         if children is None:
             children = []
@@ -898,7 +894,7 @@ class BaseNXObject(NxSearch):
     def _populate_from_attributes(self, attributes):
         """Fills in an object with the desired attributes.
            Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
+           when getting objects from the Switch.
         """
         pass
 
@@ -915,11 +911,11 @@ class BaseNXObject(NxSearch):
     @classmethod
     def get_filtered(cls, session, toolkit_class, switch_class, parent=None):
         """
-        Generic classmethod to get all of a particular APIC class.
+        Generic classmethod to get all of a particular Switch class.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         :param toolkit_class: nxtoolkit class to return
-        :param switch_class:  String containing class name from the APIC object\
+        :param switch_class:  String containing class name from the Switch object\
                             model.
         :param parent:  Object to assign as the parent to the created objects.
         """
@@ -927,7 +923,7 @@ class BaseNXObject(NxSearch):
 
         filter_str = ''
         if parent is not None:
-            filter_str = parent.get_url(parent.get_identifier())
+            filter_str = parent.get_url(parent)
 
         query_url = ('%s?query-target=subtree&'
                      'target-subtree-class=%s' % (filter_str, switch_class))
@@ -946,11 +942,11 @@ class BaseNXObject(NxSearch):
     @classmethod
     def get(cls, session, toolkit_class, switch_class, parent=None):
         """
-        Generic classmethod to get all of a particular APIC class.
+        Generic classmethod to get all of a particular Switch class.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         :param toolkit_class: nxtoolkit class to return
-        :param switch_class:  String containing class name from the APIC object\
+        :param switch_class:  String containing class name from the Switch object\
                             model.
         :param parent:  Object to assign as the parent to the created objects.
         """
@@ -1128,7 +1124,7 @@ class BaseNXPhysObject(BaseNXObject):
 
     @staticmethod
     def get_url(fmt='json'):
-        """Get the URL used to push the configuration to the APIC
+        """Get the URL used to push the configuration to the Switch
         if no fmt parameter is specified, the format will be 'json'
         otherwise it will return '/api/mo/uni.' with the fmt string appended.
 
@@ -1172,10 +1168,10 @@ class BaseNXPhysObject(BaseNXObject):
 
     @classmethod
     def exists(cls, session, phys_obj):
-        """Check if an switch phys_obj exists on the APIC.
+        """Check if a switch phys_obj exists on the Switch.
         Returns True if the phys_obj does exist.
 
-        :param session: APIC session to use when accessing the APIC controller.
+        :param session: Switch session to use when accessing the Switch controller.
         :param phys_obj: The object that you are checking for.
         :returns: True if the phys_obj exists, False if it does not.
         """
@@ -1310,14 +1306,14 @@ class BaseNXPhysModule(BaseNXPhysObject):
 
     @classmethod
     def get_obj(cls, session, switch_classes, parent_node):
-        """Gets all of the Nodes from the APIC.  This is called by the
+        """Gets all of the Nodes from the Switch.  This is called by the
         module specific get() methods.  The parameters passed include the
-        APIC object class, switch_classes, so that this will work for
+        Switch object class, switch_classes, so that this will work for
         different kinds of modules.
 
         :param parent_node: parent object or node id
-        :param session: APIC session to use when retrieving the nodes
-        :param switch_classes: The object class in APIC to retrieve
+        :param session: Switch session to use when retrieving the nodes
+        :param switch_classes: The object class in Switch to retrieve
         :returns: list of module objects derived from the specified switch_classes
 
         """
@@ -1359,7 +1355,7 @@ class BaseNXPhysModule(BaseNXPhysObject):
     def _populate_from_attributes(self, attributes):
         """Fills in an object with the desired attributes.
            Overridden by inheriting classes to provide the specific attributes
-           when getting objects from the APIC.
+           when getting objects from the Switch.
         """
         self.serial = str(attributes['ser'])
         self.model = str(attributes['model'])
@@ -1368,7 +1364,7 @@ class BaseNXPhysModule(BaseNXPhysObject):
         self.modify_time = str(attributes['modTs'])
 
     def _get_firmware(self, dist_name):
-        """Gets the firmware and bios version for the module from the "running" object in APIC.
+        """Gets the firmware and bios version for the module from the "running" object in Switch.
 
         :param dist_name: dn of module, a string
 

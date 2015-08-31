@@ -18,39 +18,49 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that shows all of the processes running on a switch
+Simple application that logs on to the Switch and displays the
+hardware buffer information.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
 
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile
+    description = """Simple application that logs on to the Switch and
+                displays the hardware buffer information."""
+    creds = NX.Credentials('switch', description)
     args = creds.get()
 
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
-
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
-
+    print "\t \t Output Shared Service Pool Buffer Utilization (in cells)"
+    
+    template = "{0:20} {1:20} {2:20} {3:20} {4:20}"
+    print(template.format(" Pool ", " Total_instant_usage ",
+                          " Rem_instant_usage ", " Max_cell_usage ",
+                          " Switch_cell_count "))
+    print(template.format("------------ ", "------------ ", "------------ ",
+                          "---------------", "---------------"))
+    hardware = NX.Hardware.get(session)
+    resp = hardware.internal.get()
+    for index in range (0,4):
+        print(template.format('SP-'+str(index),
+                              resp.buffer['total_instant'][index],
+                              resp.buffer['rem_instant'][index],
+                              resp.buffer['max_cell'][index],
+                              resp.buffer['switch_cell'][index]))    
+    
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()

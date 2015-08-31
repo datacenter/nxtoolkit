@@ -23,7 +23,8 @@ of the physical nodes; both belonging to and connected to the
 fabric.
 """
 import sys
-from nxtoolkit.nxtoolkit import Session, Credentials, Interface, ExternalSwitch
+from nxtoolkit.nxtoolkit import (Session, Credentials,
+                                 Interface, ExternalSwitch)
 
 
 def main():
@@ -34,8 +35,9 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = ('Simple application that logs on to the Switch and displays all'
-                   ' of the physical nodes; both belonging to and connected to the fabric.')
+    description = ('Simple application that logs on to the Switch and'
+                    'displays all of the physical nodes; both belonging'
+                    ' to and connected to the fabric.')
     creds = Credentials('switch', description)
     args = creds.get()
 

@@ -16,11 +16,10 @@
 #    under the License.                                                        #
 #                                                                              #
 ################################################################################
-"""NX Toolkit module for counter and stats objects
+"""
+NX Toolkit module for counter and stats objects
 """
 
-# import json
-# import logging
 import re
 
 
@@ -30,7 +29,7 @@ class InterfaceStats(object):
     retrieve the stats.  The stats are returned as a dictionary with the
     following structure:
 
-    stats= {<counterFamily>:{<granularity>:{<period>:{<counter>:value}}}}
+    stats= {<counterFamily>:{<counter>:value}}
 
     stats are gathered and summed up in time intervals or granularities.
     For each granularity there are a set of time periods identified by
@@ -60,21 +59,16 @@ class InterfaceStats(object):
     def get_all_ports(cls, session, period=None):
         """
         This method will get all the interface stats for all of the interfaces and return it as a dictionary indexed by the interface id.
-        This method is optimized to minimize the traffic to and from the APIC and is intended to typically be used with the period specified
+        This method is optimized to minimize the traffic to and from the Switch and is intended to typically be used with the period specified
         so that only the necessary stats are pulled.  Note that it will pull the stats for ALL the interfaces.  This may have latency
         implications.
 
-        :param session: Session to use when accessing the APIC
+        :param session: Session to use when accessing the Switch
         :param period: Epoch or period to retrieve - all are retrieved if this is not specified
 
         :returns:  Dictionary of counters. Format is {<interface_id>{<counterFamily>:
                         {<granularity>:{<period>:{<counter>:value}}}}}
         """
-        # request stats
-        # for each port
-        #   parse port id
-        #   process stats
-        #   save stats per port id
 
         if period:
             if (period < 1):
@@ -118,25 +112,15 @@ class InterfaceStats(object):
         Retrieve the count dictionary.  This method will read in all the
         counters and return them as a dictionary.
 
-        :param session: Session to use when accessing the APIC
-        :param period: Epoch or period to retrieve - all are retrieved if this is not specified
-
-        :returns:  Dictionary of counters. Format is {<counterFamily>:{<granularity>:{<period>:{<counter>:value}}}}
+        :param session: Session to use when accessing the Switch
+        
+        :returns:  Dictionary of counters. Format is {<counterFamily>: {<counter>:value}}
         """
         result = {}
         if not session:
             session = self._parent._session
 
-        if period:
-            if (period < 1):
-                raise ValueError('Counter epoch value of 0 not yet implemented')
-
-            mo_query_url = '/api/mo/' + self._interfaceDn + \
-                           '.json?&rsp-subtree-include=stats&rsp-subtree-class=' \
-                           'statsHist&rsp-subtree-filter=eq(statsHist.index,"'+str(period-1)+'")'
-        else:
-            mo_query_url = '/api/mo/' + self._interfaceDn + '.json?query-target=self&rsp-subtree-include=stats'
-
+        mo_query_url = '/api/mo/' + self._interfaceDn + '.json?rsp-subtree=full&rsp-subtree-include=stats'
         ret = session.get(mo_query_url)
         data = ret.json()['imdata']
 
@@ -144,139 +128,43 @@ class InterfaceStats(object):
         # store the result to be accessed by the retrieve method
         self.result = result
         return result
-
+    
     @staticmethod
     def _process_data(data):
         result = {}
+        # List of attributes to be skipped
+        skip_attr_list = ['childAction', 'clearTs', 'rn', 'status', 'babble']
         if data:
             if 'children' in data['l1PhysIf']:
                 children = data['l1PhysIf']['children']
                 for grandchildren in children:
                     for count in grandchildren:
-                        counterAttr = grandchildren[count]['attributes']
-                        if re.search('^C', counterAttr['rn']):
-                            period = 0
-                        else:
-                            period = int(counterAttr['index']) + 1
-
-                        if 'EgrTotal' in count:
-                            countName = 'egrTotal'
-                        elif 'EgrBytes' in count:
-                            countName = 'egrBytes'
-                        elif 'EgrPkts' in count:
-                            countName = 'egrPkts'
-                        elif 'EgrDropPkts' in count:
-                            countName = 'egrDropPkts'
-                        elif 'IngrBytes' in count:
-                            countName = 'ingrBytes'
-                        elif 'IngrPkts' in count:
-                            countName = 'ingrPkts'
-                        elif 'IngrTotal' in count:
-                            countName = 'ingrTotal'
-                        elif 'IngrDropPkts' in count:
-                            countName = 'ingrDropPkts'
-                        elif 'IngrUnkBytes' in count:
-                            countName = 'ingrUnkBytes'
-                        elif 'IngrUnkPkts' in count:
-                            countName = 'ingrUnkPkts'
-                        elif 'IngrStorm' in count:
-                            countName = 'ingrStorm'
-                        else:
-                            countName = count
-
-                        granularity = re.search('(\d+\D+)$', count).group(1)
-
-                        if countName not in result:
-                            result[countName] = {}
-                        if granularity not in result[countName]:
-                            result[countName][granularity] = {}
-                        if period not in result[countName][granularity]:
-                            result[countName][granularity][period] = {}
-
-                        if countName in ['egrTotal', 'ingrTotal']:
-                            for attrName in ['bytesAvg', 'bytesCum', 'bytesMax', 'bytesMin', 'bytesPer',
-                                             'pktsAvg', 'pktsCum', 'pktsMax', 'pktsMin', 'pktsPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['bytesRate', 'bytesRateAvg', 'bytesRateMax', 'bytesRateMin',
-                                             'pktsRate', 'pktsRateAvg', 'pktsRateMax', 'pktsRateMin']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-
-                        elif countName in ['egrBytes', 'ingrBytes']:
-                            for attrName in ['floodAvg', 'floodCum', 'floodMax', 'floodMin', 'floodPer',
-                                             'multicastAvg', 'multicastCum', 'multicastMax', 'multicastMin', 'multicastPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['floodRate',
-                                             'multicastRate', 'multicastRateAvg', 'multicastRateMax', 'multicastRateMin']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-
-                        elif countName in ['egrPkts', 'ingrPkts']:
-                            for attrName in ['floodAvg', 'floodCum', 'floodMax', 'floodMin', 'floodPer',
-                                             'multicastAvg', 'multicastCum', 'multicastMax', 'multicastMin', 'multicastPer',
-                                             'unicastAvg', 'unicastCum', 'unicastMax', 'unicastMin', 'unicastPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['floodRate', 'multicastRate', 'unicastRate']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-
-                        elif countName in ['egrDropPkts']:
-                            for attrName in ['afdWredAvg', 'afdWredCum', 'afdWredMax', 'afdWredMin', 'afdWredPer',
-                                             'bufferAvg', 'bufferCum', 'bufferMax', 'bufferMin', 'bufferPer',
-                                             'errorAvg', 'errorCum', 'errorMax', 'errorMin', 'errorPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['afdWredRate',
-                                             'bufferRate',
-                                             'errorRate']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-                        elif countName in ['ingrDropPkts']:
-                            for attrName in ['bufferAvg', 'bufferCum', 'bufferMax', 'bufferMin', 'bufferPer',
-                                             'errorAvg', 'errorCum', 'errorMax', 'errorMin', 'errorPer',
-                                             'forwardingAvg', 'forwardingCum', 'forwardingMax', 'forwardingMin', 'forwardingPer',
-                                             'lbAvg', 'lbCum', 'lbMax', 'lbMin', 'lbPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['bufferRate', 'errorRate', 'forwardingRate', 'lbRate']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-
-                        elif countName in ['ingrUnkBytes']:
-                            for attrName in ['unclassifiedAvg', 'unclassifiedCum', 'unclassifiedMax', 'unclassifiedMin', 'unclassifiedPer',
-                                             'unicastAvg', 'unicastCum', 'unicastMax', 'unicastMin', 'unicastPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['unclassifiedRate', 'unicastRate']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-
-                        elif countName in ['ingrUnkPkts']:
-                            for attrName in ['unclassifiedAvg', 'unclassifiedCum', 'unclassifiedMax', 'unclassifiedMin', 'unclassifiedPer',
-                                             'unicastAvg', 'unicastCum', 'unicastMax', 'unicastMin', 'unicastPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['unclassifiedRate', 'unicastRate']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-                        elif countName in ['ingrStorm']:
-                            for attrName in ['dropBytesAvg', 'dropBytesCum', 'dropBytesMax', 'dropBytesMin', 'dropBytesPer']:
-                                result[countName][granularity][period][attrName] = int(counterAttr[attrName])
-                            for attrName in ['dropBytesRate', 'dropBytesRateAvg', 'dropBytesRateMax', 'dropBytesRateMin']:
-                                result[countName][granularity][period][attrName] = float(counterAttr[attrName])
-                        else:
-                            print('Found unsupported counter ' + str(countName) + " " + str(granularity) + " " + str(period))
-                        result[countName][granularity][period]['intervalEnd'] = counterAttr.get('repIntvEnd')
-                        result[countName][granularity][period]['intervalStart'] = counterAttr.get('repIntvStart')
+                        if count in ['rmonIfIn', 'rmonIfOut', 'rmonEtherStats']:
+                            result[count] = {}
+                            result[count]['totalPkts'] = 0
+                            counterAttr = grandchildren[count]['attributes']
+                            for att in counterAttr:
+                                if att in ['broadcastPkts', 'multicastPkts',  'ucastPkts']:
+                                    result[count]['totalPkts'] += int(counterAttr[att])
+                                    result[count][att] = int(counterAttr[att])
+                                elif att in ['octetRate', 'packetRate']:
+                                    result[count][att] = float(counterAttr[att])
+                                elif att not in skip_attr_list: 
+                                    result[count][att] = counterAttr[att]
 
         return result
 
-    def retrieve(self, countFamily, granularity, period, countName):
+    def retrieve(self, countFamily, countName):
         """
         This will return the requested count from stats that were loaded with
         the previous get().  It will return 0 for counts that don't exist or
         None for time stamps that don't exist.
 
-        Note that this method will not access the APIC, it will only work on
+        Note that this method will not access the Switch, it will only work on
         data that was previously loaded with a get().
 
        :param countFamily: The counter family string.  Examples are
                            'egrTotal', 'ingrDropPkts, etc.
-       :param granularity: String specifying the counter time granularity.
-                           Possible values are: '5min', '15min', '1h', '1d',\
-                           '1w', '1mo', '1qtr', and '1year'
-       :param period: Integer of time period to get the counter from.
-                      Period 0 is the current period. Period 1 is the\
-                      previous time granularity.
        :param countName: Name of the actual counter.  Examples are
                          'unicastPer', 'unicastRate', etc.  Counter
                          names are unique per counter family.
@@ -284,31 +172,13 @@ class InterfaceStats(object):
        :returns:  integer, float or None.  If the counter is not present,
                   it will return 0.
         """
-
-        # initialize result to a miss
-        if countName in ['intervalEnd', 'intervalStart']:
-            result = None
-
-        elif countName in ['pktsRate', 'pktsRateAvg', 'pktsRateMax',
-                           'pktsRateMin', 'bytesRate', 'bytesRateAvg',
-                           'bytesRateMax', 'bytesRateMin', 'floodRate',
-                           'unicastRate', 'unclassifiedRate', 'afdWredRate',
-                           'bufferRate', 'errorRate', 'forwardingRate',
-                           'lbRate', 'multicastRate', 'multicastRateAvg',
-                           'multicastRateMax', 'multicastRateMin',
-                           'dropBytesRate', 'dropBytesRateAvg',
-                           'dropBytesRateMax', 'dropBytesRateMin']:
+           
+        if countName in ['octetRate', 'packetRate']:
             result = 0.0
         else:
             result = 0
-
-        # overwrite result if it exists
         if countFamily in self.result:
-            if granularity in self.result[countFamily]:
-                if period in self.result[countFamily][granularity]:
-                    if countName in self.result[countFamily][granularity][period]:
-
-                        # read value
-                        result = self.result[countFamily][granularity][period][countName]
-
+            if countName in self.result[countFamily]:
+                result = self.result[countFamily][countName]
         return result
+

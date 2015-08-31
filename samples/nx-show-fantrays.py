@@ -18,8 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and displays all
-of the Interfaces.
+Simple application that logs on to the Switch and fan info
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -33,7 +32,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = 'Simple application that logs on to the Switch and displays all of the Interfaces.'
+    description = '''Simple application that logs on to the Switch
+                    and fan info.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -60,8 +60,10 @@ def main():
 
     # Display the data downloaded
     template = "{0:5} {1:12} {2:^11} {3:^10} {4:9} {5:10} {6:5}"
-    print(template.format("SLOT", "MODEL", "SERIAL NUM", "OPER STATE", "ID", "DIRECTION", "SPEED"))
-    print(template.format("----", "------------", "-----------", "----------", "---------", "----------", "-----"))
+    print(template.format("SLOT", "MODEL", "SERIAL NUM", "OPER STATE",
+                          "ID", "DIRECTION", "SPEED"))
+    print(template.format("----", "------------", "-----------", "----------",
+                          "---------", "----------", "-----"))
     for rec in data:
         print(template.format(*rec))
 

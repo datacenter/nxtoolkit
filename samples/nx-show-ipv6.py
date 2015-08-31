@@ -18,39 +18,57 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that shows all of the processes running on a switch
+Simple application that logs on to the Switch and get ipv6 details.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
 
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile
+    description = '''Simple application that logs on to the
+                    Switch and get ipv6 details.'''
+    creds = NX.Credentials('switch', description)
     args = creds.get()
 
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
 
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
+    # Get ipv6 datas from the switch
+    ipv6 = NX.IPV6.get(session)
+    
+    # Display ipv6 interface details
+    template = "{0:15} {1:15} {2:32}"
+    print(template.format(" Interface ", " Admin status ",
+                          " IPv6 addresses / Link-local address"))
+    print(template.format("-----------", "--------------",
+                          "------------------------------------"))
+    for iface in ipv6.interfaces:
+        print(template.format(iface.get_if_name(), iface.get_admin_st(),
+                              iface.get_address()))
+    
+    # Display ipv6 route details    
+    template = "{0:20} {1:15} {2:15} {3:15} {4:15}"
+    for route in ipv6.routes:
+        print "\nRoute prefix : %s" % (route.prefix)
+        for n_hop in route.next_hops:
+            print(template.format("\tNext Hop Addr ", " Interface    ",
+                                  " Vrf  ", " Tag ", " Track Id"))
+            print(template.format("\t--------------", "--------------",
+                                  "------", "-----", "---------"))
+            print(template.format("\t"+n_hop.addr, n_hop.i_face, n_hop.vrf,
+                                  n_hop.tag, n_hop.track_id))
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()

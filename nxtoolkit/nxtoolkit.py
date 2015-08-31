@@ -21,13 +21,13 @@
 """
 import sys
 from .nxTable import Table
-# from .nxphysobject import Interface
 from .nxphysobject import *
 from .nxbaseobject import BaseNXObject, BaseRelation, BaseInterface
 from .nxsession import Session
 from .nxtoolkitlib import Credentials
 import logging
 import json
+import socket
 
 
 def cmdline_login_to_apic(description=''):
@@ -50,12 +50,10 @@ class Subnet(BaseNXObject):
 
     def __init__(self, subnet_name, parent=None):
         """
-        :param subnet_name: String containing the name of this Subnet instance.
+        :param subnet_name: String containing the name of this Subnet instance
         :param parent: An instance of BridgeDomain class representing the\
                        BridgeDomain which contains this Subnet.
         """
-        if not isinstance(parent, BridgeDomain):
-            raise TypeError('Parent of Subnet class must be BridgeDomain')
         super(Subnet, self).__init__(subnet_name, parent)
         self._addr = None
         self._scope = None
@@ -63,9 +61,9 @@ class Subnet(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('fvSubnet')
@@ -124,7 +122,7 @@ class Subnet(BaseNXObject):
 
     def _populate_from_attributes(self, attributes):
         """
-        Sets the attributes when creating objects from the APIC.
+        Sets the attributes when creating objects from the Switch.
         Called from the base object when calling the classmethod get()
         """
         self.set_addr(str(attributes.get('ip')))
@@ -132,14 +130,14 @@ class Subnet(BaseNXObject):
     @classmethod
     def get(cls, session, bridgedomain, tenant):
         """
-        Gets all of the Subnets from the APIC for a particular tenant and
+        Gets all of the Subnets from the Switch for a particular tenant and
         bridgedomain.
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param bridgedomain: the instance of BridgeDomain used to limit the\
-                             Subnet instances retreived from the APIC
+                             Subnet instances retreived from the Switch
         :param tenant: the instance of Tenant used to limit the Subnet\
-                       instances retreived from the APIC
+                       instances retreived from the Switch
         :returns: List of Subnet objects
 
         """
@@ -153,20 +151,28 @@ class L3Inst(BaseNXObject):
     def __init__(self, l3inst_name, parent=None):
         """
         :param l3inst_name: String containing the L3Inst name
-        :param parent: An instance of Tenant class representing the Tenant\
+        :param parent: An instance of Tenant class representing the Tenant
                        which contains this L3Inst.
 
         """
         super(L3Inst, self).__init__(l3inst_name, parent)
         self.name = l3inst_name
         self.adminState = 'admin-up'
+        self._children = []
+
+    def add_l2bd(self, l2bd_obj=None):
+
+        if not isinstance(l2bd_obj, L2BD):
+            raise TypeError('A L2BD object required')
+
+        self._children.append(l2bd_obj)
 
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('l3Inst')
@@ -175,9 +181,9 @@ class L3Inst(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Nexus class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {}
 
@@ -191,9 +197,9 @@ class L3Inst(BaseNXObject):
         return None
 
     @staticmethod
-    def get_url(str, fmt='json'):
+    def get_url(fmt='json'):
         """
-        Get the URL used to push the configuration to the APIC
+        Get the URL used to push the configuration to the Switch
         if no format parameter is specified, the format will be 'json'
         otherwise it will return '/api/mo/uni.' with the format string
         appended.
@@ -223,7 +229,7 @@ class L3Inst(BaseNXObject):
 
     def _populate_from_attributes(self, attributes):
         """
-        Sets the attributes when creating objects from the APIC.
+        Sets the attributes when creating objects from the Switch.
         Called from the base object when calling the classmethod get()
         """
         self.descr = attributes.get('descr')
@@ -257,11 +263,11 @@ class L3Inst(BaseNXObject):
     @classmethod
     def get(cls, session, tenant=None):
         """
-        Gets all of the L3Insts from the APIC.
+        Gets all of the L3Insts from the Switch.
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param tenant: the instance of Tenant used to limit the L3Insts\
-                       retreived from the APIC
+                       retreived from the Switch
         :returns: List of L3Inst objects
         """
         return BaseNXObject.get(session, cls, cls._get_switch_classes()[0],
@@ -306,9 +312,9 @@ class L2BD(BaseNXObject):
 
     def __init__(self, bd_name, parent=None):
         """
-        :param bd_name:  String containing the name of this L2BD\
+        :param bd_name:  String containing the name of this L2BD
                          object.
-        :param parent: An instance of Tenant class representing the Tenant\
+        :param parent: An instance of Tenant class representing the Tenant
                        which contains this L2BD.
         """
         super(L2BD, self).__init__(bd_name, parent)
@@ -322,9 +328,9 @@ class L2BD(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('l2BD')
@@ -333,9 +339,9 @@ class L2BD(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Switch class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {'fvSubnet': Subnet, }
 
@@ -480,15 +486,18 @@ class L2BD(BaseNXObject):
         """
         Gets all of the Bridge Domains from the Switch.
 
-        :param session: the instance of Session used for APIC communication
-        :param tenant: the instance of Tenant used to limit the L2BD\
-                       instances retreived from the APIC
+        :param session: the instance of Session used for Switch communication
         :returns: List of L2BD objects
         """
         return BaseNXObject.get(session, cls, cls._get_switch_classes()[0])
 
     def _get_url_extension(self):
         return '/bd-[%s]' % self.name
+    
+    def get_url(self, fmt='.json'):
+        
+        # Default inst is used
+        return '/api/node/mo/sys/inst-default' + self._get_url_extension() + fmt
 
     def _populate_from_attributes(self, attributes):
         """
@@ -547,339 +556,6 @@ class L2BD(BaseNXObject):
         return [table, ]
 
 
-class L3Interface(BaseNXObject):
-    """
-    Creates an L3 interface that can be attached to an L2 interface.
-    This interface defines the L3 address i.e. IPv4
-    """
-
-    def __init__(self, name):
-        """
-        :param name:  String containing the name of this L3Interface object.
-        """
-        super(L3Interface, self).__init__(name)
-        self._addr = None
-        self._l3if_type = None
-        self._mtu = 'inherit'
-        self.networks = []
-
-    def is_interface(self):
-        """
-        Check if this is an interface object.
-
-        :returns: True
-        """
-
-        return True
-
-    def get_addr(self):
-        """
-        Get the L3 address assigned to this interface.
-        The address is set via the L3Interface.set_addr() method
-
-        :returns: String containing the L3 address in dotted decimal notation.
-        """
-        return self._addr
-
-    def set_addr(self, addr):
-        """
-        Set the L3 address assigned to this interface
-
-        :param addr: String containing the L3 address in dotted decimal\
-                     notation.
-        """
-        self._addr = addr
-
-    def get_mtu(self):
-        """
-        Get the MTU of this interface
-
-        :returns: MTU of the interface
-        """
-        return self._mtu
-
-    def set_mtu(self, mtu):
-        """
-        Set the L3 MTU of this interface
-
-        :param mtu: String containing MTU
-
-        """
-        self._mtu = mtu
-
-    def get_l3if_type(self):
-        """
-        Get the l3if_type of this L3 interface.
-
-        :returns: L3 interface type. Valid values are 'sub-interface',\
-                  'l3-port', and 'ext-svi'
-        """
-        return self._l3if_type
-
-    def set_l3if_type(self, l3if_type):
-        """
-        Set the l3if_type of this L3 interface.
-
-        :param l3if_type: L3 interface type. Valid values are 'sub-interface',\
-                          'l3-port', and 'ext-svi'
-        """
-        if l3if_type not in ('sub-interface', 'l3-port', 'ext-svi'):
-            raise ValueError("l3if_type is not one of 'sub-interface', "
-                             "'l3-port', or 'ext-svi'")
-        self._l3if_type = l3if_type
-
-    # Context references
-    def add_context(self, context):
-        """
-        Add context to the EPG
-
-        :param context: Instance of Context class to assign to this\
-                        L3Interface.
-        """
-        assert isinstance(context, Context)
-        if self.has_context():
-            self.remove_context()
-        self._add_relation(context)
-
-    def remove_context(self):
-        """
-        Remove context from the EPG
-        """
-        self._remove_all_relation(Context)
-
-    def get_context(self):
-        """
-        Return the assigned context
-
-        :returns: Instance of Context class that this L3Interface is assigned.\
-                  If no Context is assigned, None is returned.
-        """
-        return self._get_any_relation(Context)
-
-    def has_context(self):
-        """
-        Check if the context has been assigned
-
-        :returns: True or False. True if a Context has been assigned to this\
-                  L3Interface.
-        """
-        return self._has_any_relation(Context)
-
-    def get_json(self):
-        """
-        Returns json representation of L3Interface
-
-        :returns: json dictionary of L3Interface
-        """
-        if self.get_addr() is None:
-            return None
-        text = {'l3extRsPathL3OutAtt': {'attributes': {'encap': '%s-%s' % (self.get_interfaces()[0].encap_type,
-                                                                           self.get_interfaces()[0].encap_id),
-                                                       'ifInstT': self.get_l3if_type(),
-                                                       'addr': self.get_addr(),
-                                                       'mtu': self.get_mtu(),
-                                                       'tDn': self.get_interfaces()[0]._get_path()},
-                                        'children': []}}
-        return text
-
-
-class OSPFInterfacePolicy(BaseNXObject):
-    """
-    Represents the interface settings of an OSPF interface
-    """
-
-    def __init__(self, name, parent=None):
-        """
-        param name: String containing the name of this OSPF interface policy
-        param parent: Instance of the Tenant class representing the tenant\
-                      owning this OSPF interface policy
-        """
-
-        self.name = name
-        self.parent = parent
-
-        # Initialize default values
-        self.network_type = 'bcast'
-        self.cost = None
-        self.priority = None
-        self.hello_interval = None
-        self.dead_interval = None
-        self.retrans_interval = None
-        self.transmit_delay = None
-
-        if not isinstance(parent, Tenant):
-            raise TypeError('Parent is not set to Tenant')
-        super(OSPFInterfacePolicy, self).__init__(name, parent)
-
-    def _generate_attributes(self):
-        """Gets the attributes used in generating the JSON for the object
-        """
-        attributes = dict()
-        attributes['name'] = self.name
-        if self.descr:
-            attributes['descr'] = self.descr
-        if self.network_type:
-            attributes['nwT'] = self.network_type
-        if self.cost:
-            attributes['cost'] = self.cost
-        if self.priority:
-            attributes['priority'] = self.priority
-        if self.hello_interval:
-            attributes['helloIntvl'] = self.hello_interval
-        if self.dead_interval:
-            attributes['deadIntvl'] = self.dead_interval
-        if self.retrans_interval:
-            attributes['rexmitIntvl'] = self.retrans_interval
-        if self.transmit_delay:
-            attributes['xmitDelay'] = self.transmit_delay
-        return attributes
-
-    def get_nw_type(self):
-        """
-        Get the nw-type of this interface ospf policy
-        :returns: string of the network type for this policy
-        """
-        return self.network_type
-
-    def set_nw_type(self, network_type):
-        """
-        sets the L3 nw_type with some validation
-
-        :param network_type: string of bcast or p2p
-
-        """
-        valid_types = ['bcast', 'p2p']
-        if network_type not in valid_types:
-            raise ValueError('Invalid Network Type - %s' % network_type)
-        else:
-            self.network_type = network_type
-
-    def get_json(self):
-        """
-        Returns json representation of OSPFRouter
-
-        :returns: json dictionary of OSPFIRouter
-        """
-        attr = self._generate_attributes()
-        text = {"ospfIfPol": {"attributes": attr}}
-        return text
-
-
-class OSPFRouter(BaseNXObject):
-    """
-    Represents the global settings of the OSPF Router
-    """
-
-    def __init__(self, name):
-        """
-        :param name:  String containing the name of this OSPFRouter object.
-        """
-        super(OSPFRouter, self).__init__(name)
-        self._router_id = None
-        self._node = None
-        self._pod = '1'
-
-    def set_router_id(self, rid):
-        """
-        Sets the router id of the object
-        :param rid: String containing the router id
-
-        """
-        self._router_id = rid
-
-    def get_router_id(self):
-        """
-        :returns string containing the Router ID
-        """
-        return self._router_id
-
-    def set_node_id(self, node):
-        """
-        Sets the router id of the object
-        :param node: String containing the node id
-
-        """
-        self._node = node
-
-    def get_node_id(self):
-        """
-        :returns string containing the Node ID
-        """
-        return self._node
-
-    def get_json(self):
-        """
-        Returns json representation of OSPFRouter
-
-        :returns: json dictionary of OSPFIRouter
-        """
-        dn_name = "topology/pod-%s/node-%s" % (self._pod, self._node)
-        text = {"l3extRsNodeL3OutAtt": {"attributes": {"rtrId": self._router_id,
-                                                       "tDn": dn_name}}}
-        return text
-
-
-class OSPFInterface(BaseNXObject):
-    """
-    Creates an OSPF router interface that can be attached to a L3 interface.
-    This interface defines the OSPF area, authentication, etc.
-    """
-
-    def __init__(self, name, router=None, area_id=None):
-        """
-        :param name:  String containing the name of this OSPFInterface object.
-        :param area_id: String containing the OSPF area id of this interface.\
-                        Default is None.
-        """
-        super(OSPFInterface, self).__init__(name)
-        self.area_id = area_id
-        self.router = router
-        self.int_policy_name = None
-        self.auth_key = None
-        self.auth_type = None
-        self.auth_keyid = None
-        self.networks = []
-
-    def is_interface(self):
-        """
-        Returns whether this instance is considered an interface.
-        :returns: True
-        """
-        return True
-
-    @staticmethod
-    def is_ospf():
-        """
-        :returns: True if this interface is an OSPF interface.  In the case\
-                  of OSPFInterface instances, this is always True.
-        """
-        return True
-
-    def get_json(self):
-        """
-        Returns json representation of OSPFInterface
-        :returns: json dictionary of OSPFInterface
-        """
-        children = []
-        if self.int_policy_name:
-            policy = {'ospfRsIfPol': {'attributes': {'tnOspfIfPolName': self.int_policy_name}}}
-            children.append(policy)
-
-        text = {'ospfIfP': {'attributes': {'name': self.name},
-                            'children': children}}
-        if self.auth_key:
-            text['ospfIfP']['attributes']['authKey'] = self.auth_key
-            text['ospfIfP']['attributes']['authKeyId'] = self.auth_keyid
-            text['ospfIfP']['attributes']['authType'] = self.auth_type
-
-        text = [text, self.get_interfaces()[0].get_json()]
-        text = {'l3extLIfP': {'attributes': {'name': self.name},
-                              'children': text}, }
-        text = {'l3extLNodeP': {'attributes': {'name': self.name},
-                                'children': [text, self.router.get_json()]}}
-        return text
-
-
 class BGPPeerAF(BaseNXObject):
     """ BGPPeerAF :  roughly equivalent to bgpPeerAf """
 
@@ -897,9 +573,9 @@ class BGPPeerAF(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('bgpPeerAf')
@@ -917,9 +593,9 @@ class BGPPeerAF(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Switch class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {}
 
@@ -962,7 +638,7 @@ class BGPPeerAF(BaseNXObject):
 
     def _populate_from_attributes(self, attributes):
         """
-        Sets the attributes when creating objects from the APIC.
+        Sets the attributes when creating objects from the Switch.
         Called from the base object when calling the classmethod get()
         """
         self.set_type(str(attributes.get('type')))
@@ -972,7 +648,7 @@ class BGPPeerAF(BaseNXObject):
         """
         Gets all of the BGPPeerAFs from the Switch for a particular BGPPeer
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param bgppeer: the instance of BGPPeer using the AF
         :returns: List of BGPPeerAF objects
 
@@ -985,7 +661,8 @@ class BGPPeer(BaseNXObject):
 
     def __init__(self, addr, parent=None):
         """
-        :param subnet_name: String containing the name of this BGPPeer instance.
+        :param subnet_name: String containing the name of this BGPPeer
+                    instance.
         :param parent: An instance of BGPDomain class representing the\
                        BGPDomain which contains this BGPPeer.
         """
@@ -1003,9 +680,9 @@ class BGPPeer(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('bgpPeer')
@@ -1023,9 +700,9 @@ class BGPPeer(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Switch class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes 
+        :returns: dict of Switch class names to nxtoolkit classes 
         """
         return {'bgpPeerAf': BGPPeerAF}
 
@@ -1158,7 +835,7 @@ class BGPPeer(BaseNXObject):
 
     def _populate_from_attributes(self, attributes):
         """
-        Sets the attributes when creating objects from the APIC.
+        Sets the attributes when creating objects from the Switch.
         Called from the base object when calling the classmethod get()
         """
         self.set_addr(str(attributes.get('addr')))
@@ -1168,9 +845,9 @@ class BGPPeer(BaseNXObject):
     @classmethod
     def get(cls, session, bgpdomain):
         """
-        Gets all of the BGPPeers from the APIC for a particular BGPDomain
+        Gets all of the BGPPeers from the Switch for a particular BGPDomain
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param bgpdomain: the instance of BGPDomain used to limit the\
                              BGPPeer instances retreived from the Switch
         :returns: List of BGPPeer objects
@@ -1200,9 +877,9 @@ class BGPAdvPrefix(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('bgpAdvPrefix')
@@ -1220,9 +897,9 @@ class BGPAdvPrefix(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Switch class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {}
 
@@ -1268,7 +945,7 @@ class BGPAdvPrefix(BaseNXObject):
 
     def _populate_from_attributes(self, attributes):
         """
-        Sets the attributes when creating objects from the APIC.
+        Sets the attributes when creating objects from the Switch.
         Called from the base object when calling the classmethod get()
         """
         self.set_addr(str(attributes.get('addr')))
@@ -1276,9 +953,9 @@ class BGPAdvPrefix(BaseNXObject):
     @classmethod
     def get(cls, session, bgpdomainaf):
         """
-        Gets all of the BGPAdvPrefix from the APIC for a particular BGPDomainAF
+        Gets all of the BGPAdvPrefix from the Switch for a particular BGPDomainAF
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param bgpdomainaf: the instance of BGPDomainAF used to limit the\
                              BGPAdvPrefix instances retreived from the Switch
         :returns: List of BGPAdvPrefix objects
@@ -1292,7 +969,8 @@ class BGPDomainAF(BaseNXObject):
 
     def __init__(self, af_type, parent=None):
         """
-        :param subnet_name: String containing the name of this BGPPeer instance.
+        :param subnet_name: String containing the name of this BGPPeer
+                instance.
         :param parent: An instance of BGPPeer class representing the\
                        BGPPeer which contains this BGPPeerAf.
         """
@@ -1304,9 +982,9 @@ class BGPDomainAF(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('bgpDomAf')
@@ -1324,9 +1002,9 @@ class BGPDomainAF(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Switch class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {'bgpAdvPrefix': BGPAdvPrefix}
 
@@ -1421,7 +1099,7 @@ class BGPDomainAF(BaseNXObject):
 
     def _populate_from_attributes(self, attributes):
         """
-        Sets the attributes when creating objects from the APIC.
+        Sets the attributes when creating objects from the Switch.
         Called from the base object when calling the classmethod get()
         """
         self.set_type(str(attributes.get('type')))
@@ -1431,13 +1109,14 @@ class BGPDomainAF(BaseNXObject):
         """
         Gets all of the BGPDomainAF from the Switch for a particular BGPDomain
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :param bgpdomain: the instance of BGPDomain using the AF
         :returns: List of BGPDomainAF objects
 
         """
         return  BaseNXObject.get_filtered(session, cls,
                                                cls._get_switch_classes()[0], bgpdomain)
+
 
 class BGPDomain(BaseNXObject):
     """
@@ -1449,7 +1128,7 @@ class BGPDomain(BaseNXObject):
         """
         :param name:  String containing the name of this BGPDomain object.
         :param as_num: String containing the IPv4 as_num
-        :param peer_ip: String containing the IP address of the BGP peer\
+        :param peer_ip: String containing the IP address of the BGP peer
                         Default is None.
         :param node_id: String Containing the node-id (e.g. '101')
         """
@@ -1469,9 +1148,9 @@ class BGPDomain(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('bgpDom')
@@ -1489,9 +1168,9 @@ class BGPDomain(BaseNXObject):
     @classmethod
     def _get_toolkit_to_switch_classmap(cls):
         """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
+        Gets the Switch class to an nxtoolkit class mapping dictionary
 
-        :returns: dict of APIC class names to nxtoolkit classes
+        :returns: dict of Switch class names to nxtoolkit classes
         """
         return {'bgpDomAf': BGPDomainAF,
                 'bgpPeer': BGPPeer}
@@ -1501,6 +1180,7 @@ class BGPDomain(BaseNXObject):
         return '/dom-%s' % self._name
 
     # Name
+    
     def get_name(self):
         """
         Get the bgpDomain Name
@@ -1653,7 +1333,7 @@ class BGPDomain(BaseNXObject):
         assert isinstance(names, list), ('names should be a list'
                                          ' of strings')
 
-        # If no tenant names passed, get all tenant names from APIC
+        # If no tenant names passed, get all tenant names from Switch
         if len(names) == 0:
             bgpdomains = BGPDomain.get(session)
             for bgpdomain in bgpdomains:
@@ -1674,7 +1354,7 @@ class BGPDomain(BaseNXObject):
                 query_url += '&rsp-prop-include=config-only'
             ret = session.get(query_url)
 
-            # the following works around a bug encountered in the json returned from the APIC
+            # the following works around a bug encountered in the json returned from the Switch
             ret._content = ret._content.replace("\\\'", "'")
 
             data = ret.json()['imdata']
@@ -1717,7 +1397,7 @@ class BGPDomain(BaseNXObject):
         Gets all of the BGP Domains from the Switch.
 
         :param parent: Parent object of the BGPDomain
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :returns: a list of BGPDomain objects
         """
         bgpdomains = BaseNXObject.get_filtered(session, cls, 
@@ -1733,10 +1413,10 @@ class BGPDomain(BaseNXObject):
     @classmethod
     def exists(cls, session, bgpdomain):
         """
-        Check if a bgpdomain exists on the APIC.
+        Check if a bgpdomain exists on the Switch.
 
-        :param session: the instance of Session used for APIC communication
-        :param bgpdomain: the instance of BGPDomain to check if exists on the APIC
+        :param session: the instance of Session used for Switch communication
+        :param bgpdomain: the instance of BGPDomain to check if exists on the Switch
         :returns: True or False
         """
         sw_bgpdomains = cls.get(session)
@@ -1745,13 +1425,14 @@ class BGPDomain(BaseNXObject):
                 return True
         return False
 
+    @staticmethod
     def get_identifier(cls):
         return cls._name
 
     @staticmethod
     def get_url(str, fmt='json'):
         """
-        Get the URL used to push the configuration to the APIC
+        Get the URL used to push the configuration to the Switch
         if no format parameter is specified, the format will be 'json'
         otherwise it will return '/api/mo/sys/bgp/inst.' with the format string
         appended.
@@ -1805,9 +1486,9 @@ class BGPSession(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('bgpInst')
@@ -1825,7 +1506,8 @@ class BGPSession(BaseNXObject):
     @staticmethod
     def _get_url_extension(self):
         return '/bgp/inst'
-
+    
+    @staticmethod
     def get_identifier(cls):
         return cls._as_num
 
@@ -1910,7 +1592,7 @@ class BGPSession(BaseNXObject):
         assert isinstance(names, list), ('names should be a list'
                                          ' of strings')
 
-        # If no tenant names passed, get all tenant names from APIC
+        # If no tenant names passed, get all tenant names from Switch
         if len(names) == 0:
             bgpsessions = BGPSession.get(session)
             for bgpsession in bgpsessions:
@@ -1931,7 +1613,7 @@ class BGPSession(BaseNXObject):
                 query_url += '&rsp-prop-include=config-only'
             ret = session.get(query_url)
 
-            # the following works around a bug encountered in the json returned from the APIC
+            # the following works around a bug encountered in the json returned from the Switch
             ret._content = ret._content.replace("\\\'", "'")
 
             data = ret.json()['imdata']
@@ -1947,13 +1629,13 @@ class BGPSession(BaseNXObject):
         return resp
 
     def _generate_attributes(self):
-        attributes = super(BGPSession, self)._generate_attributes()
+        attributes = {}
         attributes['asn'] = self._as_num
         return attributes
 
     def _populate_from_attributes(self, attributes):
         self._as_num = str(attributes['asn'])
-
+    
     def get_json(self):
         """
         Returns json representation of BGPSession
@@ -1962,8 +1644,11 @@ class BGPSession(BaseNXObject):
         """
 
         attr = self._generate_attributes()
-        return super(BGPSession, self).get_json(self._get_switch_classes()[0],
+        bgp_inst = super(BGPSession, self).get_json(self._get_switch_classes()[0],
                                                 attributes=attr)
+
+        return {'bgpEntity': {'attributes': {},
+                       'children': [bgp_inst]}}
 
     @classmethod
     def get(cls, session, parent=None):
@@ -1971,7 +1656,7 @@ class BGPSession(BaseNXObject):
         Gets all of the BGP Sessions from the Switch.
 
         :param parent: Parent object of the BGPSession
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :returns: a list of BGPSession objects
         """
         bgpsessions = BaseNXObject.get(session, cls, cls._get_switch_classes()[0])
@@ -1985,10 +1670,10 @@ class BGPSession(BaseNXObject):
     @classmethod
     def exists(cls, session, bgpsession):
         """
-        Check if a bgpsession exists on the APIC.
+        Check if a bgpsession exists on the Switch.
 
-        :param session: the instance of Session used for APIC communication
-        :param bgpsession: the instance of BGPSession to check if exists on the APIC
+        :param session: the instance of Session used for Switch communication
+        :param bgpsession: the instance of BGPSession to check if exists on the Switch
         :returns: True or False
         """
         sw_bgpsessions = cls.get(session)
@@ -2000,7 +1685,7 @@ class BGPSession(BaseNXObject):
     @staticmethod
     def get_url(str, fmt='json'):
         """
-        Get the URL used to push the configuration to the APIC
+        Get the URL used to push the configuration to the Switch
         if no format parameter is specified, the format will be 'json'
         otherwise it will return '/api/mo/sys/bgp/inst.' with the format string
         appended.
@@ -2008,7 +1693,7 @@ class BGPSession(BaseNXObject):
         :param fmt: optional format string, default is 'json'
         :returns: URL string
         """
-        return '/api/mo/sys/bgp/inst/.' + fmt
+        return '/api/mo/sys/bgp/.' + fmt
 
     @staticmethod
     def get_table(bgpsessions, title=''):
@@ -2107,9 +1792,9 @@ class FilterEntry(BaseNXObject):
     @classmethod
     def get(cls, session, parent, tenant):
         """
-        To get all of nxtoolkit style Filter Entries APIC class.
+        To get all of nxtoolkit style Filter Entries Switch class.
 
-        :param session:  the instance of Session used for APIC communication
+        :param session:  the instance of Session used for Switch communication
         :param parent:  Object to assign as the parent to the created objects.
         :param tenant:  Tenant object to assign the created objects.
         """
@@ -2233,504 +1918,200 @@ class FilterEntry(BaseNXObject):
         return True
 
 
-class TunnelInterface(object):
-    """This class describes a tunnel interface"""
-
-    def __init__(self, if_type, pod, node, tunnel):
-        self.interface_type = str(if_type)
-        self.pod = str(pod)
-        self.node = str(node)
-        self.tunnel = tunnel
-        self.if_name = self.interface_type + ' ' + self.pod + '/'
-        self.if_name += self.node + '/' + self.tunnel
-
-
-class FexInterface(object):
-    """This class describes a physical interface on a FEX device"""
-
-    def __init__(self, if_type, pod, node, fex, module, port):
-        self.interface_type = str(if_type)
-        self.pod = str(pod)
-        self.node = str(node)
-        self.fex = str(fex)
-        self.module = str(module)
-        self.port = str(port)
-        self.if_name = self.interface_type + ' ' + self.pod + '/'
-        self.if_name += self.node + '/' + self.fex + '/'
-        self.if_name += self.module + '/' + self.port
-
-
-class InterfaceFactory(object):
-    """
-    Factory class to generate interface objects
-    """
-
-    @classmethod
-    def create_from_dn(cls, dn):
-        """
-        Creates the appropriate interface object based on the dn
-        The classes along with an example DN are shown below
-        Interface: topology/pod-1/paths-102/pathep-[eth1/12]
-        FexInterface: topology/pod-1/paths-103/extpaths-105/pathep-[eth1/12]
-        TunnelInterface:
-        BladeSwitchInterface:
-        """
-        if '/extpaths-' in dn:
-            # Split the URL into 2 parts
-            dn_parts = dn.split('[')
-
-            # Split the first part
-            loc = dn_parts[0].split('/')
-            assert loc[0] == 'topology'
-            # Get the Pod number
-            pod = loc[1].split('-')
-            assert pod[0] == 'pod'
-            pod = pod[1]
-            # Get the Node number
-            node = loc[2].split('-')
-            assert node[0] == 'paths'
-            node = node[1]
-            # Get the Fex number
-            fex = loc[3].split('-')
-            assert fex[0] == 'extpaths'
-            fex = fex[1]
-            # Get the type, module, and port
-            mod_port = dn_parts[1].split(']')[0]
-            if_type = mod_port[:3]
-            (module, port) = mod_port[3:].split('/')
-            return FexInterface(if_type, pod, node, fex, module, port)
-        elif 'pathep-[tunnel' in dn:
-            # Split the URL into 2 parts
-            dn_parts = dn.split('[')
-
-            # Split the first part
-            loc = dn_parts[0].split('/')
-            assert loc[0] == 'topology'
-            # Get the Pod number
-            pod = loc[1].split('-')
-            assert pod[0] == 'pod'
-            pod = pod[1]
-            # Get the Node number
-            node = loc[2].split('-')
-            assert node[0] == 'paths'
-            node = node[1]
-            # Get the tunnel
-            assert loc[3] == 'pathep-'
-            tunnel = dn_parts[1].split(']')[0]
-            assert tunnel.startswith('tunnel')
-            tunnel = tunnel[6:]
-
-            return TunnelInterface('tunnel', pod, node, tunnel)
-        else:
-            return Interface(*Interface.parse_dn(dn))
-
-
 class PortChannel(BaseInterface):
     """
     This class defines a port channel interface.
     """
 
-    def __init__(self, name):
-        super(PortChannel, self).__init__(name)
-        self._interfaces = []
+    def __init__(self, pc_id, admin_st=None, delay=None, descr=None,
+                 layer=None, duplex=None, mtu=None,
+                 snmp_trap=None, speed=None, link_log=None,
+                 session=None, mode=None, min_link=None, interfaces=None,
+                 pc_mode=None):
+        
+        if not isinstance(pc_id, str):
+            raise TypeError ('string expected')
+        self.if_name = 'po' + pc_id
+        super(PortChannel, self).__init__(name=self.if_name)
+        
+        self.pc_id = pc_id
+        self.admin_st = admin_st
+        self.delay = delay
+        self.descr = descr
+        self.layer = layer
+        self.duplex = duplex
+        self.link_log = link_log
+        self.mtu = mtu
+        self.snmp_trap = snmp_trap
+        self.speed = speed
+        self._session = session
+        self.mode = mode
+        self.min_link = min_link
+        self.access_vlan = None
+        self.pc_mode = pc_mode
+        if interfaces is None:
+            self._interfaces = []
+        else:
+            self._interfaces = copy.deepcopy(interfaces)
+
         self._nodes = []
 
     def attach(self, interface):
         """Attach an interface to this PortChannel"""
         if interface not in self._interfaces:
             self._interfaces.append(interface)
-        self._update_nodes()
+            
+    def set_access_vlan(self, access):
+        """Set vlans for port channel"""
+        self.access_vlan = access
 
     def detach(self, interface):
         """Detach an interface from this PortChannel"""
         if interface in self._interfaces:
             self._interfaces.remove(interface)
-        self._update_nodes()
-
-    def _update_nodes(self):
-        """Updates the nodes that are participating in this PortChannel"""
-        nodes = []
-        for interface in self._interfaces:
-            nodes.append(interface.node)
-        self._nodes = set(nodes)
 
     def is_vpc(self):
         """Returns True if the PortChannel is a VPC"""
-        return len(self._nodes) > 1
+        return len(self._interfaces) > 1
 
     def is_interface(self):
         """Returns True since a PortChannel is an interface"""
         return True
 
-    def _get_nodes(self):
+    def _get_interfaces(self):
         """ Returns a single node id or multiple node ids in the
             case that this is a VPC
         """
-        return self._nodes
+        return self._interfaces
+    
+    def _get_attributes(self):
 
-    def _get_path(self):
-        """Get the path of this interface used when communicating with
-           the APIC object model.
+        attributes = {}
+        attributes['pcId'] = self.pc_id
+        if self.admin_st:
+            attributes['adminSt'] = self.admin_st
+        if self.delay:
+            attributes['delay'] = self.delay
+        if self.descr:
+            attributes['descr'] = self.descr
+        if self.duplex:
+            attributes['duplex'] = self.duplex
+        if self.layer:
+            attributes['layer'] = self.layer
+        if self.link_log:
+            attributes['linkLog'] = self.link_log
+        if self.mtu:
+            attributes['mtu'] = self.mtu
+        if self.snmp_trap:
+            attributes['snmpTrapSt'] = self.snmp_trap
+        if self.speed:
+            attributes['speed'] = self.speed
+        if self.mode:
+            attributes['mode'] = self.mode
+        if self.min_link:
+            attributes['minLinks'] = self.min_link
+        if self.pc_mode:
+            attributes['pcMode'] = self.pc_mode
+        if self.if_name:
+            attributes['name'] = self.if_name
+        attributes['id'] = self.if_name
+        if self.access_vlan:
+            attributes['accessVlan'] = self.access_vlan
+
+        return attributes
+
+    def get_url(self, fmt='json'):
         """
-        assert len(self._interfaces)
-        pod = self._interfaces[0].pod
-        if self.is_vpc():
-            (node1, node2) = self._get_nodes()
-            path = 'topology/pod-%s/protpaths-%s-%s/pathep-[%s]' % (pod,
-                                                                    node1,
-                                                                    node2,
-                                                                    self.name)
-        else:
-            node = self._interfaces[0].node
-            path = 'topology/pod-%s/paths-%s/pathep-%s' % (pod,
-                                                           node,
-                                                           self.name)
-
-        return path
-
-    @staticmethod
-    def get_url(str, fmt='json'):
-        """
-        Get the URLs used to push the configuration to the APIC
+        Get the URLs used to push the configuration to the Switch
         if no format parameter is specified, the format will be 'json'
         otherwise it will return '/api/mo/uni.' with the format string
         appended.
         :param fmt: optional format string, default is 'json'
         :returns: URL string
         """
-        return ('/api/mo/uni/fabric.' + fmt,
-                '/api/mo/uni.' + fmt)
+        #return '/api/mo/sys/aggr-[po%s].json' % (self.pc_id)
+        return '/api/mo/sys/intf/aggr-[po%s].json' % (self.pc_id)
 
     def get_json(self):
         """
         Returns json representation of the PortChannel
 
        :returns: json dictionary of the PortChannel
-        """
-        vpc = self.is_vpc()
-        pc_mode = 'link'
-        if vpc:
-            pc_mode = 'node'
-        infra = {'infraInfra': {'children': []}}
-        # Add the node and port selectors
+        """  
+        attributes = self._get_attributes()
+        
+        children = []
         for interface in self._interfaces:
-            node_profile, accport_selector = interface.get_port_channel_selector_json(self.name)
-            infra['infraInfra']['children'].append(node_profile)
-            if self.is_deleted():
-                for hports in accport_selector['infraAccPortP']['children']:
-                    if 'infraHPortS' in hports:
-                        for child in hports['infraHPortS']['children']:
-                            if 'infraRsAccBaseGrp' in child:
-                                child['infraRsAccBaseGrp']['attributes']['status'] = 'deleted'
-            infra['infraInfra']['children'].append(accport_selector)
-        # Add the actual port-channel
-        accbndlgrp = {'infraAccBndlGrp': {'attributes': {'name': self.name, 'lagT': pc_mode},
-                                          'children': []}}
-        if self.is_deleted():
-            accbndlgrp['infraAccBndlGrp']['attributes']['status'] = 'deleted'
-        infrafuncp = {'infraFuncP': {'attributes': {},
-                                     'children': [accbndlgrp]}}
-        infra['infraInfra']['children'].append(infrafuncp)
-
-        if not vpc:
-            return None, infra
-
-        # VPC add Fabric Protocol Policy
-        # Pick the lowest node as the unique id for the vpc group
-        nodes = []
-        for interface in self._interfaces:
-            nodes.append(str(interface.node))
-        unique_nodes = sorted(set(nodes))
-        unique_id = unique_nodes[0]
-
-        fabric_nodes = []
-        for node in unique_nodes:
-            fabric_node = {'fabricNodePEp': {'attributes': {'id': node}}}
-            fabric_nodes.append(fabric_node)
-        fabric_group = {'fabricExplicitGEp': {'attributes': {'name': 'vpc' + unique_id, 'id': unique_id},
-                                              'children': fabric_nodes}}
-        fabric_prot_pol = {'fabricProtPol': {'attributes': {'name': 'vpc' + unique_id},
-                                             'children': [fabric_group]}}
-        return fabric_prot_pol, infra
+            att = {'tDn': 'sys/intf/phys-[%s]' % (interface.if_name)}
+            child = BaseNXObject.get_json(self, 'pcRsMbrIfs', attributes=att)
+            children.append(child)
+            
+        return super(PortChannel, self).get_json('pcAggrIf',
+                                                 attributes=attributes,
+                                                 children=children)
 
     @staticmethod
-    def get(session):
-        """Gets all of the port channel interfaces from the APIC
+    def get(session, pc_id=None):
+        """Gets all of the port channel interfaces from the Switch
+        
+        :param session: the instance of Session used for switch communication
+        :param pc_id: string port channel id
+        :return list of PortChannel objects
         """
+        
         if not isinstance(session, Session):
             raise TypeError('An instance of Session class is required')
-        interface_query_url = ('/api/node/class/infraAccBndlGrp.json?'
-                               'query-target=self')
-        portchannels = []
-        ret = session.get(interface_query_url)
-        pc_data = ret.json()['imdata']
-        for pc in pc_data:
-            portchannel_name = str(pc['infraAccBndlGrp']['attributes']['name'])
-            portchannel = PortChannel(portchannel_name)
-            portchannels.append(portchannel)
-        return portchannels
-
-
-class Endpoint(BaseNXObject):
-    """
-    Endpoint class
-    """
-
-    def __init__(self, name, parent):
-        if not isinstance(parent, EPG):
-            raise TypeError('Parent must be of EPG class')
-        super(Endpoint, self).__init__(name, parent=parent)
-        self.mac = None
-        self.ip = None
-        self.encap = None
-        self.if_name = None
-
-    @classmethod
-    def _get_switch_classes(cls):
-        """
-        Get the APIC classes used by this nxtoolkit class.
-
-        :returns: list of strings containing APIC class names
-        """
-        resp = []
-        resp.append('fvCEp')
-        resp.append('fvStCEp')
-        return resp
-
-    @classmethod
-    def _get_toolkit_to_switch_classmap(cls):
-        """
-        Gets the APIC class to an nxtoolkit class mapping dictionary
-
-        :returns: dict of APIC class names to nxtoolkit classes
-        """
-        return {}
-
-    @staticmethod
-    def _get_parent_class():
-        """
-        Gets the class of the parent object
-
-        :returns: class of parent object
-        """
-        return EPG
-
-    @staticmethod
-    def _get_parent_dn(dn):
-        if '/stcep-' in dn:
-            return dn.split('/stcep-')[0]
+        
+        if pc_id:
+            if not isinstance(pc_id, str):
+                raise TypeError('When specifying a specific port channel id'
+                            'the port id must be a identified by a str')
+            query_url = '/api/mo/sys/aggr-[po%s].json?rsp-subtree=full'\
+                                                        % str(pc_id)
         else:
-            return dn.split('/cep-')[0]
+            query_url = '/api/class/pcAggrIf.json?rsp-subtree=full'
 
-    @staticmethod
-    def _get_name_from_dn(dn):
-        if '/stcep-' in dn:
-            name = dn.split('/stcep-')[1].split('-type-')[0]
-        else:
-            name = dn.split('/cep-')[1]
-        return name
-
-    def get_json(self):
-        return None
-
-    def _populate_from_attributes(self, attributes):
-        if 'mac' not in attributes:
-            return
-        self.mac = str(attributes.get('mac'))
-        self.ip = str(attributes.get('ip'))
-        self.encap = str(attributes.get('encap'))
-
-    @classmethod
-    def get_event(cls, session, with_relations=True):
-        urls = cls._get_subscription_urls()
-        for url in urls:
-            if not session.has_events(url):
-                continue
-            event = session.get_event(url)
-            for class_name in cls._get_switch_classes():
-                if class_name in event['imdata'][0]:
-                    break
-            attributes = event['imdata'][0][class_name]['attributes']
-            status = str(attributes.get('status'))
-            dn = str(attributes.get('dn'))
-            parent = cls._get_parent_from_dn(cls._get_parent_dn(dn))
-            if status == 'created':
-                name = str(attributes.get('mac'))
-            else:
-                name = cls._get_name_from_dn(dn)
-            obj = cls(name, parent=parent)
-            obj._populate_from_attributes(attributes)
-            obj.timestamp = str(attributes.get('modTs'))
-            if obj.mac is None:
-                obj.mac = name
-            if status == 'deleted':
-                obj.mark_as_deleted()
-            elif with_relations:
-                objs = cls.get(session, name)
-                if len(objs):
-                    obj = objs[0]
-                else:
-                    # Endpoint was deleted before we could process the create
-                    # return what we what we can from the event
-                    pass
-            return obj
-
-    @staticmethod
-    def _get(session, endpoint_name, interfaces, endpoints,
-             apic_endpoint_class, endpoint_path):
-        """
-        Internal function to get all of the Endpoints
-
-        :param session: Session object to connect to the APIC
-        :param endpoint_name: string containing the name of the endpoint
-        :param interfaces: list of interfaces
-        :param endpoints: list of endpoints
-        :param apic_endpoint_class: class of endpoint
-        :param endpoint_path: interface of the endpoint
-        :return: list of Endpoints
-        """
-        # Get all of the Endpoints
-        if endpoint_name is None:
-            endpoint_query_url = ('/api/node/class/%s.json?query-target=self'
-                                  '&rsp-subtree=full' % apic_endpoint_class)
-        else:
-            endpoint_query_url = ('/api/node/class/%s.json?query-target=self'
-                                  '&query-target-filter=eq(%s.mac,"%s")'
-                                  '&rsp-subtree=full' % (apic_endpoint_class,
-                                                         apic_endpoint_class,
-                                                         endpoint_name))
-        ret = session.get(endpoint_query_url)
-        ep_data = ret.json()['imdata']
-        for ep in ep_data:
-            if ep[apic_endpoint_class]['attributes']['lcC'] == 'static':
-                continue
-            if 'children' in ep[apic_endpoint_class]:
-                children = ep[apic_endpoint_class]['children']
-            else:
-                children = []
-            ep = ep[apic_endpoint_class]['attributes']
-            tenant = Tenant(str(ep['dn']).split('/')[1][3:])
-            if '/LDevInst-' in str(ep['dn']):
-                unknown = '?' * 10
-                app_profile = AppProfile(unknown, tenant)
-                epg = EPG(unknown, app_profile)
-            else:
-                app_profile = AppProfile(str(ep['dn']).split('/')[2][3:],
-                                         tenant)
-                epg = EPG(str(ep['dn']).split('/')[3][4:], app_profile)
-            endpoint = Endpoint(str(ep['name']), parent=epg)
-            endpoint.mac = str(ep['mac'])
-            endpoint.ip = str(ep['ip'])
-            endpoint.encap = str(ep['encap'])
-            endpoint.timestamp = str(ep['modTs'])
-            for child in children:
-                if endpoint_path in child:
-                    endpoint.if_name = str(child[endpoint_path]['attributes']['tDn'])
-                    for interface in interfaces:
-                        interface = interface['fabricPathEp']['attributes']
-                        interface_dn = str(interface['dn'])
-                        if endpoint.if_name == interface_dn:
-                            if str(interface['lagT']) == 'not-aggregated':
-                                endpoint.if_name = InterfaceFactory.create_from_dn(interface_dn).if_name
-                            else:
-                                endpoint.if_name = interface['name']
-                    endpoint_query_url = '/api/mo/' + endpoint.if_name + '.json'
-                    ret = session.get(endpoint_query_url)
-            endpoints.append(endpoint)
-        return endpoints
-
-    @staticmethod
-    def get(session, endpoint_name=None):
-        """Gets all of the endpoints connected to the fabric from the APIC
-        """
-        if not isinstance(session, Session):
-            raise TypeError('An instance of Session class is required')
-
-        # Get all of the interfaces
-        interface_query_url = ('/api/node/class/fabricPathEp.json?'
-                               'query-target=self')
-        ret = session.get(interface_query_url)
-        interfaces = ret.json()['imdata']
-
-        endpoints = []
-        endpoints = Endpoint._get(session, endpoint_name, interfaces,
-                                  endpoints, 'fvCEp', 'fvRsCEpToPathEp')
-        endpoints = Endpoint._get(session, endpoint_name, interfaces,
-                                  endpoints, 'fvStCEp', 'fvRsStCEpToPathEp')
-
-        return endpoints
-
-    @classmethod
-    def get_all_by_epg(cls, session, tenant_name, app_name, epg_name, with_interface_attachments=True):
-        if with_interface_attachments:
-            raise NotImplementedError
-        query_url = ('/api/mo/uni/tn-%s/ap-%s/epg-%s.json?'
-                     'rsp-subtree=children&'
-                     'rsp-subtree-class=fvCEp,fvStCEp' % (tenant_name, app_name, epg_name))
-        ret = session.get(query_url)
-        data = ret.json()['imdata']
-        endpoints = []
-        if len(data) == 0:
-            return endpoints
-        assert len(data) == 1
-        assert 'fvAEPg' in data[0]
-        if 'children' not in data[0]['fvAEPg']:
-            return endpoints
-        endpoints_data = data[0]['fvAEPg']['children']
-        if len(endpoints_data) == 0:
-            return endpoints
-        tenant = Tenant(tenant_name)
-        app = AppProfile(app_name, tenant)
-        epg = EPG(epg_name, app)
-        for ep_data in endpoints_data:
-            if 'fvStCEp' in ep_data:
-                mac = ep_data['fvStCEp']['attributes']['mac']
-                ip = ep_data['fvStCEp']['attributes']['ip']
-            else:
-                mac = ep_data['fvCEp']['attributes']['mac']
-                ip = ep_data['fvCEp']['attributes']['ip']
-            ep = cls(str(mac), epg)
-            ep.mac = mac
-            ep.ip = ip
-            endpoints.append(ep)
-        return endpoints
-
-    @staticmethod
-    def get_table(endpoints, title=''):
-        """
-        Will create table of taboo information for a given tenant
-        :param title:
-        :param endpoints:
-        """
-
-        result = []
-        headers = ['Tenant', 'Context', 'Bridge Domain', 'App Profile', 'EPG', 'Name', 'MAC', 'IP', 'Interface',
-                   'Encap']
-        data = []
-        for endpoint in sorted(endpoints, key=lambda x: (x.name)):
-            epg = endpoint.get_parent()
-            bd = 'Not Set'
-            context = 'Not Set'
-            if epg.has_bd():
-                bd = epg.get_bd().name
-                if epg.get_bd().has_context():
-                    context = epg.get_bd().get_context().name
-
-            data.append([
-                endpoint.get_parent().get_parent().get_parent().name,
-                context,
-                bd,
-                endpoint.get_parent().get_parent().name,
-                endpoint.get_parent().name,
-                endpoint.name,
-                endpoint.mac,
-                endpoint.ip,
-                endpoint.if_name,
-                endpoint.encap
-            ])
-        data = sorted(data, key=lambda x: (x[1], x[2], x[3], x[4]))
-        result.append(Table(data, headers, title=title + 'Endpoints'))
-        return result
+        pc_list = []
+        
+        port_chs = session.get(query_url).json()['imdata']
+        for pc in port_chs:
+            pc_id = str(pc['pcAggrIf']['attributes']['pcId'])
+            layer = str(pc['pcAggrIf']['attributes']['layer'])
+            admin_st = str(pc['pcAggrIf']['attributes']['adminSt'])
+            desc = str(pc['pcAggrIf']['attributes']['descr'])
+            duplex = str(pc['pcAggrIf']['attributes']['duplex'])
+            delay = str(pc['pcAggrIf']['attributes']['duplex'])
+            link_log = str(pc['pcAggrIf']['attributes']['linkLog'])
+            mtu = str(pc['pcAggrIf']['attributes']['mtu'])
+            snmp_trap = str(pc['pcAggrIf']['attributes']['snmpTrapSt'])
+            speed = str(pc['pcAggrIf']['attributes']['speed'])
+            session = session
+            mode = str(pc['pcAggrIf']['attributes']['mode'])
+            min_link = str(pc['pcAggrIf']['attributes']['minLinks'])
+            pc_mode = str(pc['pcAggrIf']['attributes']['pcMode'])
+            access_vlan = str(pc['pcAggrIf']['attributes']['accessVlan'])
+            trunk_vlans = str(pc['pcAggrIf']['attributes']['trunkVlans'])
+            
+            interfaces = []
+            for int in pc['pcAggrIf']['children']:
+                if int.get('pcRsMbrIfs'):
+                    interface = str(int['pcRsMbrIfs']['attributes']['tSKey'])
+                    #module = interface.replace('eth', '').split('/')[0]
+                    #port = interface.replace('eth', '').split('/')[1]
+                    #interfaces.append(Interface('eth', module, port))
+                    interfaces.append(Interface(interface))
+                    
+            new_pc = PortChannel(pc_id=pc_id, admin_st=admin_st,
+                                       layer=layer, descr=desc, duplex=duplex,
+                                       delay=delay, link_log=link_log,
+                                       mtu=mtu, snmp_trap=snmp_trap,
+                                       speed=speed, session=session, mode=mode,
+                                       min_link=min_link, interfaces=interfaces,
+                                       pc_mode=pc_mode)
+            new_pc.set_access_vlan(access_vlan)
+   
+            pc_list.append(new_pc)
+        return pc_list
 
 
 class L2ExtDomain(BaseNXObject):
@@ -2777,9 +2158,9 @@ class L2ExtDomain(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('l2extDomP')
@@ -2795,9 +2176,9 @@ class L2ExtDomain(BaseNXObject):
     def get(cls, session):
 
         """
-        Gets all of the L2Ext Domains from the APIC
+        Gets all of the L2Ext Domains from the Switch
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :returns: List of L2ExtDomain objects
 
         """
@@ -2826,9 +2207,9 @@ class L2ExtDomain(BaseNXObject):
     def get_by_name(cls, session, infra_name):
 
         """
-        Gets all of the Physical Domainss from the APIC
+        Gets all of the Physical Domainss from the Switch
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :returns: List of L2ExtDomain objects
 
         """
@@ -2900,9 +2281,9 @@ class L3ExtDomain(BaseNXObject):
     @classmethod
     def _get_switch_classes(cls):
         """
-        Get the APIC classes used by this nxtoolkit class.
+        Get the Switch classes used by this nxtoolkit class.
 
-        :returns: list of strings containing APIC class names
+        :returns: list of strings containing Switch class names
         """
         resp = []
         resp.append('l3extDomP')
@@ -2918,9 +2299,9 @@ class L3ExtDomain(BaseNXObject):
     def get(cls, session):
 
         """
-        Gets all of the Physical Domains from the APIC
+        Gets all of the Physical Domains from the Switch
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :returns: List of L3Ext Domain objects
 
         """
@@ -2950,9 +2331,9 @@ class L3ExtDomain(BaseNXObject):
     def get_by_name(cls, session, infra_name):
 
         """
-        Gets all of the L3Ext Domains from the APIC
+        Gets all of the L3Ext Domains from the Switch
 
-        :param session: the instance of Session used for APIC communication
+        :param session: the instance of Session used for Switch communication
         :returns: List of L3Ext Domain objects
 
         """
@@ -3008,8 +2389,9 @@ class NetworkPool(BaseNXObject):
             fvnsEncapInstP_string = 'fvnsVlanInstP'
         elif self.encap_type == 'vxlan':
             fvnsEncapInstP_string = 'fvnsVxlanInstP'
-        fvnsEncapInstP = {fvnsEncapInstP_string: {'attributes': {'name': self.name,
-                                                                 'allocMode': self.mode},
+        fvnsEncapInstP = {fvnsEncapInstP_string: {'attributes': 
+                                                  {'name': self.name,
+                                                    'allocMode': self.mode},
                                                   'children': [fvnsEncapBlk]}}
         infra = {'infraInfra': {'attributes': {},
                                 'children': [fvnsEncapInstP]}}
@@ -3030,7 +2412,7 @@ class Search(BaseNXObject):
 
 
 class BaseMonitorClass(object):
-    """ Base class for monitoring policies.  These are methods that can be
+    """ Base class for monitoring policies. These are methods that can be
         used on all monitoring objects.
     """
 
@@ -3055,7 +2437,7 @@ class BaseMonitorClass(object):
     def isModified(self):
         """
         Returns True if this policy and any children have been modified or
-        created and not been written to the APIC
+        created and not been written to the Switch
         """
         for child in self._children:
             if child.isModified():
@@ -3149,14 +2531,14 @@ class MonitorPolicy(BaseMonitorClass):
     how statistics are gathered. It has immediate children, CollectionPolicy
     objects, that control the default behavior for any network element that
     uses this monitoring policy.  It may optionally have MonitorTarget objects
-    as children that are used to override the default behavior for a particular
-    target class such as Interfaces.  There can be further granularity of
-    control through children of the MonitorTarget sub-objects.
+    as children that are used to override the default behavior for a
+    particular target class such as Interfaces.  There can be further 
+    granularity of control through children of the MonitorTarget sub-objects.
 
     Children of the MonitorPolicy will be CollectionPolicy objects that define
     the collection policy plus optional MonitorTarget objects that allow finer
-    grained control over specific target APIC objects such as 'l1PhysIf' (layer
-    1 physical interface).
+    grained control over specific target Switch objects such as 'l1PhysIf'
+    (layer 1 physical interface).
 
     The CollectionPolicy children are contained in a dictionary called
     "collection_policy" that is indexed by the granulariy of the
@@ -3170,10 +2552,10 @@ class MonitorPolicy(BaseMonitorClass):
     attach that monitoring policy to the port.
 
     Note that the name of the MonitorPolicy is used to construct the dn of the
-    object in the APIC.  As a result, the name cannot be changed.  If you read
-    a policy from the APIC, change the name, and write it back, it will create
-    a new policy with the new name and leave the old, original policy, in place
-    with its original name.
+    object in the Switch.  As a result, the name cannot be changed. 
+    If you read a policy from the Switch, change the name, and write it back,
+    it will create a new policy with the new name and leave the old, original
+    policy, in place with its original name.
 
     A description may be optionally added to the policy.
     """
@@ -3187,9 +2569,9 @@ class MonitorPolicy(BaseMonitorClass):
         types. Initially however, both policies can have l1PhysIf as targets.
 
         A name must be specified because it is used to build the distinguising
-        name (dn) along with the policyType in the APIC.  The dn for "fabric"
-        policies will be /uni/fabric/monfabric-[name] and for "access" policies
-        it will be /uni/infra/moninfra-[name] in the APIC.
+        name (dn) along with the policyType in the Switch.  The dn for
+        "fabric" policies will be /uni/fabric/monfabric-[name] and for "access"
+        policies it will be /uni/infra/moninfra-[name] in the Switch.
 
         :param policyType:  String specifying whether this is a fabric or\
                             access policy
@@ -3206,18 +2588,18 @@ class MonitorPolicy(BaseMonitorClass):
         self.collection_policy = {}
         self.monitor_target = {}
 
-        # assume that it has not been written to APIC.  This is cleared if the
-        # policy is just loaded from APIC or the policy is written to the APIC.
+        # assume that it has not been written to Switch.  This is cleared if the
+        # policy is just loaded from Switch or the policy is written to the Switch.
         self.modified = True
 
     @classmethod
     def get(cls, session):
         """
-        get() will get all of the monitor policies from the APIC and return
+        get() will get all of the monitor policies from the Switch and return
         them as a list.  It will get both fabric and access (infra) policies
         including default policies.
 
-       :param session: the instance of Session used for APIC communication
+       :param session: the instance of Session used for Switch communication
        :returns: List of MonitorPolicy objects
         """
         result = []
@@ -3243,7 +2625,7 @@ class MonitorPolicy(BaseMonitorClass):
     @staticmethod
     def _getClass(session, nxClass):
         """
-        Get the class from the APIC
+        Get the class from the Switch
 
         :param session: Session object instance
         :param nxClass: string containing classname
@@ -3365,7 +2747,7 @@ class MonitorPolicy(BaseMonitorClass):
         retention value that is the final result of resolving the policy
         hierarchy.
 
-        :param target:  APIC target object.  This will default to 'l1PhysIf'
+        :param target:  Switch target object.  This will default to 'l1PhysIf'
         :returns: Dictionary of statistic administrative state and retentions
                   indexed by counter family and granularity.
         """
@@ -3437,7 +2819,7 @@ class MonitorTarget(BaseMonitorClass):
     This class is a child of a MonitorPolicy object. It is used to specify a
     scope for appling a monitoring policy.  An example scope would be the
     Interface class, meaning that the monitoring policies specified here will
-    apply to all Interface clas objects (l1PhysIf in the APIC) that use the
+    apply to all Interface clas objects (l1PhysIf in the Switch) that use the
     parent MonitoringPolicy as their monitoring policy.
 
     Children of the MonitorTarget will be CollectionPolicy objects that define
@@ -3482,9 +2864,9 @@ class MonitorTarget(BaseMonitorClass):
         self._parent.add_target(self)
         self.collection_policy = {}
         self.monitor_stats = {}
-        # assume that it has not been written to APIC.
-        # This is cleared if the policy is just loaded from APIC
-        # or the policy is written to the APIC.
+        # assume that it has not been written to Switch.
+        # This is cleared if the policy is just loaded from Switch
+        # or the policy is written to the Switch.
         self.modified = True
 
     def __str__(self):
@@ -3525,13 +2907,13 @@ class MonitorStats(BaseMonitorClass):
         CollectionPolicy objects indexed by their granularity, e.g. '5min',
         '15min', etc.
 
-       :param parent: Parent object that this monitor stats object should be\
+       :param parent: Parent object that this monitor stats object should be
                       applied to. This must be an object of type MonitorTarget.
-       :param statsFamily: String specifying the statistics family that the\
-                           children collection policies should be applied to.\
-                           Possible values are:['egrBytes', 'egrPkts',\
-                           'egrTotal', 'egrDropPkts', 'ingrBytes', 'ingrPkts',\
-                           'ingrTotal', 'ingrDropPkts', 'ingrUnkBytes',\
+       :param statsFamily: String specifying the statistics family that the
+                           children collection policies should be applied to.
+                           Possible values are:['egrBytes', 'egrPkts',
+                           'egrTotal', 'egrDropPkts', 'ingrBytes', 'ingrPkts',
+                           'ingrTotal', 'ingrDropPkts', 'ingrUnkBytes',
                            'ingrUnkPkts', 'ingrStorm']
         """
         if not type(parent) in [MonitorTarget]:
@@ -3546,9 +2928,9 @@ class MonitorStats(BaseMonitorClass):
         self.name = ''
         self._parent.add_stats(self)
         self.collection_policy = {}
-        # assume that it has not been written to APIC.  This is cleared if
-        # the policy is just loaded from APIC or the policy is written to
-        # the APIC.
+        # assume that it has not been written to Switch.  This is cleared if
+        # the policy is just loaded from Switch or the policy is written to
+        # the Switch.
         self.modified = True
 
     def __str__(self):
@@ -3574,7 +2956,7 @@ class CollectionPolicy(BaseMonitorClass):
     object.  This has yet to be implemented.
 
     This object is roughly the same as the statsColl and statsHierColl objects
-    in the APIC.
+    in the Switch.
     """
     # this must be in order from small to large
     granularityEnum = ['5min', '15min', '1h', '1d',
@@ -3584,33 +2966,33 @@ class CollectionPolicy(BaseMonitorClass):
 
     def __init__(self, parent, granularity, retention, adminState='enabled'):
         """
-        The CollectionPolicy must always be initialized with a parent object of
-        type MonitorPolicy, MonitorTarget or MonitorStats. The granularity must
-        also be specifically specified.  The retention period can be specified,
-        set to "none", or set to "inherited".
-        Note that the "none" value is a string, not the Python None.  When the
-        retention period is set to "none" there will be no historical stats
-        kept. However, assuming collection is enabled, stats will be kept for
+        The CollectionPolicy must always be initialized with a parent object
+        of type MonitorPolicy, MonitorTarget or MonitorStats. The granularity
+        must also be specifically specified.  The retention period can be 
+        specified, set to "none", or set to "inherited". Note that the "none"
+        value is a string, not the Python None.  When the retention period is
+        set to "none" there will be no historical stats kept. However, 
+        assuming collection is enabled, stats will be kept for
         the current time period.
 
         If the retention period is set to "inherited", the value will be
         inherited from the less specific policy directly above this one. The
-        same applies to the adminState value.  It can be 'disabled', 'enabled',
-        or 'inherited'.  If 'disabled', the current scope of counters are not
-        gathered.  If enabled, they are gathered.  If 'inherited', it will be
-        according to the next higher scope.
+        same applies to the adminState value.  It can be 'disabled',
+        'enabled', or 'inherited'.  If 'disabled', the current scope of 
+        counters are not gathered.  If enabled, they are gathered.  If 
+        'inherited', it will be according to the next higher scope.
 
         Having the 'inherited' option on the retention and administrative
         status allows these items independently controlled at the current
         stats granularity.  For example, you can specify that ingress unknown
         packets are gathered every 15 minutes by setting adding a collection
         policy that specifies a 15 minutes granularity and an adminState of
-        'enabled' under a MonitorStats object that sets the scope to be ingress
-        unknown packets.  This might override a higher level policy that
-        disabled collection at a 15 minute interval.   However, you can set the
-        retention in that same object to be "inherited" so that this specific
-        policy does not change the retention behavior from that of the higher,
-        less specific, policy.
+        'enabled' under a MonitorStats object that sets the scope to be 
+        ingress unknown packets.  This might override a higher level policy
+        that disabled collection at a 15 minute interval.   However, you can
+        set the retention in that same object to be "inherited" so that this
+        specific policy does not change the retention behavior from that of 
+        the higher, less specific, policy.
 
         When the CollectionPolicy is a child at the top level, i.e. of the
         MonitorPolicy, the 'inherited' option is not allowed because there
@@ -3659,9 +3041,9 @@ class CollectionPolicy(BaseMonitorClass):
         self._children = []
 
         self._parent.add_collection_policy(self)
-        # assume that it has not been written to APIC.  This is cleared if
-        # the policy is just loaded from APIC or the policy is written to
-        # the APIC.
+        # assume that it has not been written to Switch.  This is cleared if
+        # the policy is just loaded from Switch or the policy is written to
+        # the Switch.
         self.modified = True
 
     def __str__(self):
@@ -3701,8 +3083,10 @@ class CollectionPolicy(BaseMonitorClass):
 
 class LogicalModel(BaseNXObject):
     """
-    This is the root class for the logical part of the network.  It's corrolary is the PhysicalModel class.
-    It is a container that can hold all of logical model instances such as Tenants.
+    This is the root class for the logical part of the network.
+    It's corrolary is the PhysicalModel class.
+    It is a container that can hold all of logical model instances such 
+    as Tenants.
 
     From this class, you can populate all of the children classes.
     """
@@ -3715,9 +3099,6 @@ class LogicalModel(BaseNXObject):
         if session:
             assert isinstance(session, Session)
 
-        # if parent:
-        #     assert isinstance(parent, Fabric)
-
         super(LogicalModel, self).__init__(name='', parent=parent)
 
         self.session = session
@@ -3725,7 +3106,9 @@ class LogicalModel(BaseNXObject):
     @classmethod
     def get(cls, session=None, parent=None):
         """
-        Method to get all of the PhysicalModels.  It will get one and return it in a list.
+        Method to get all of the PhysicalModels.  It will get one and 
+        return it in a list.
+        
         :param session:
         :param parent:
         :return: list of PhysicalModel
@@ -3745,10 +3128,1461 @@ class LogicalModel(BaseNXObject):
         :param include_concrete:
         :return: list of immediate children objects
         """
-        Tenant.get(self.session, self)
 
         if deep:
             for child in self._children:
                 child.populate_children(deep, include_concrete)
 
         return self._children
+
+
+class LinkNeighbors(BaseNXObject):
+    """
+    This class represents cdp or lldp neighbors information
+    
+    """
+    
+    def __init__(self, disc_proto='cdp', session=None, attributes=None):
+        """
+        Initialization of cdp and lldp information
+        
+        :param disc_proto: string contains name of discovery 
+               protocol (cdp, lldp)
+        :param session: the instance of Session used for switch communication
+        :param attributes: A dictionary contains neighbors information
+         
+        :return:
+        """
+        super(LinkNeighbors, self).__init__(name="")
+        self._session = session
+        if attributes is None:
+            self.attributes = {}
+        else:
+            self.attributes = copy.deepcopy(attributes)
+        self.disc_proto = disc_proto
+
+    @classmethod
+    def _is_feature_enabled(cls, session, f_name=None):
+        """
+        This method will check if the f_name feature is enabled in the 
+        switch. If enabled return True or else return False
+        
+        :param session: the instance of Session used for switch communication
+        :param f_name: String represents a feature name
+        
+        :return Boolean value
+        """
+        feature_url = '/api/mo/sys/fm.json?rsp-subtree=full'
+        resp = session.get(feature_url)
+        for fm in resp.json()['imdata']:
+            if fm.get('fmEntity'):
+                for feature in fm['fmEntity']['children']:
+                    if feature.get('fm'+f_name.title()):
+                        return True
+        return False
+     
+    @classmethod
+    def get(cls, session, disc_proto='auto', module=None, port=None):
+        """
+        Gets cdp or lldp neighbors details depending on disc_proto parameter
+        
+        :param session: the instance of Session used for switch communication
+        :param disc_proto: Discovery protocol used for getting neighbors 
+               (default: cdp)
+        :param module: Module id string.  This specifies the module or
+                       slot of the port. (optional)
+        :param port: Port number.  This is the port to read. (optional)
+
+        :returns: list of LinkNeighbors object
+        
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+
+        if port:
+            if not isinstance(port, str):
+                raise TypeError('When specifying a specific port, the port'
+                                ' must be a identified by a string')
+            if not isinstance(module, str):
+                raise TypeError(('When specifying a specific port, the module'
+                                 ' must be identified by a string'))
+        
+        if disc_proto.lower() in ['auto', 'lldp']:
+            # If discovery protocol is auto or lldp, then check if lldp is 
+            # enabled and use it. If lldp is not enabled use cdp
+            if LinkNeighbors._is_feature_enabled(session, 'lldp'):
+                disc_proto = 'lldp'
+            else:
+                disc_proto = 'cdp'
+        else:
+            # If some random values is passed in disc_proto, then cdp is used
+            disc_proto = 'cdp'
+        
+        iface_name = ''
+        if module and port:
+            iface_name = '/if-[eth{0}/{1}]'.format(module, port)
+        query_url = ('/api/mo/sys/%s/inst%s.json?rsp-subtree=full' 
+                     % (disc_proto, iface_name))
+        neighbors_resp = session.get(query_url)
+        
+        neighbors = neighbors_resp.json()['imdata']
+            
+        if module and port:
+            children = neighbors
+        else:
+            children = neighbors[0][disc_proto+'Inst']['children']
+
+        resp = []
+        adj_epg = disc_proto+'AdjEp'
+        proto_if = disc_proto+'If'
+        for ch in children:
+            for sub_ch in ch[proto_if]['children']:
+                if sub_ch.get(adj_epg):
+                    attributes = {}
+                    attributes['devId'] = str(sub_ch[adj_epg]['attributes']\
+                                              ['devId'])
+                    attributes['portId'] = str(sub_ch[adj_epg]['attributes']\
+                                               ['portId'])
+                    attributes['sysName'] = str(sub_ch[adj_epg]['attributes']\
+                                                ['sysName'])
+                    attributes['ver'] = str(sub_ch[adj_epg]['attributes']\
+                                            ['ver'])
+                    attributes['cap'] = str(sub_ch[adj_epg]['attributes']\
+                                            ['cap'])
+                    # Currently hold time is now supported
+                    attributes['Hldtme'] = '-'
+                    if disc_proto == 'cdp':
+                        attributes['platId'] = \
+                        str(sub_ch[adj_epg]['attributes']['platId'])
+                    else:
+                        attributes['platId'] = "-"
+                    # attributes['id'] holds local interface
+                    attributes['id'] = str(ch[proto_if]['attributes']['id'])
+                    attributes['operSt'] = str(ch[proto_if]['attributes']\
+                                               ['operSt'])
+                    resp.append(LinkNeighbors(disc_proto=disc_proto,
+                                          session=session,
+                                          attributes=attributes))
+                    
+        return resp
+
+
+class HardwareInternal(object):
+    """
+    This class defines hardware internal details
+    
+    """
+    def __init__(self, parent):
+        self._parent = parent
+    
+    def buff_pkt_details(self, session):
+        """
+        :param session: Session object
+        :return Json output of buffer packet details
+        
+        """
+        command = 'show hardware  internal buffer info pkt-stats detail'
+        return session.post_nxapi(command).text
+    
+    def get(self, session=None):
+        """
+        :param session: Session object
+        :return 
+        
+        """
+        if not session:
+            session = self._parent._session
+            
+        resp = self.buff_pkt_details(session) 
+        buffer_info = json.loads(resp)['ins_api']['outputs']['output']\
+        ['body']['TABLE_module']['ROW_module']
+        module_number = buffer_info['module_number']
+        if module_number:
+            hardware_int = HardwareInternal(session)            
+            hardware_int.buffer = {}
+            hardware_int.buffer['total_instant'] = []
+            hardware_int.buffer['rem_instant'] = []
+            hardware_int.buffer['switch_cell'] = []
+            hardware_int.buffer['max_cell'] = []
+
+            pars = buffer_info['TABLE_instance']['ROW_instance']
+            for index in range (1,5):
+                total_ins = "total_instant_usage_" + str(index)
+                rem_ins = "rem_instant_usage_" + str(index)
+                max_cel = "max_cell_usage_" + str(index)
+                switch_cel = "switch_cell_count_" + str(index)
+                hardware_int.buffer['total_instant'].append(pars[total_ins])
+                hardware_int.buffer['rem_instant'].append(pars[rem_ins])
+                hardware_int.buffer['max_cell'].append(pars[max_cel])
+                hardware_int.buffer['switch_cell'].append(pars[switch_cel])
+                
+        return hardware_int
+            
+    
+class Hardware(BaseNXObject):
+
+    def __init__(self, session=None):
+        self.internal = HardwareInternal(self)
+        self._session = session
+    
+    @classmethod
+    def get(cls, session,  type='nxapi'):
+        
+        """
+        :param session: Session object
+        :param type: String defines type of REST call (nxapi default)
+        """
+        
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        if type == 'nxapi':
+            return Hardware(session)
+
+
+class LogTimeStamp(object):
+    """
+    This class defines timestamp logging
+    
+    """
+    def __init__(self, session=None, parent=None, format='seconds'):
+        self._session= session
+        self._parent = parent
+        self.format= format
+        self.object = 'syslogTimeStamp' 
+    
+    def get(self, session=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return LogTimeStamp object
+        """
+        query_url = '/api/mo/sys/syslog/timestamp.json'
+        
+        if not session:
+            session = self._session
+            
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            format = ret[self.object]['attributes']['format']
+            
+            return LogTimeStamp(format=format)
+
+    def _get_attributes(self):
+        att = {}
+        att['format'] = self.format
+        return att
+    
+    def get_json(self):
+        return { self.object: { "attributes": self._get_attributes()}}
+
+
+class LogMonitor(object):
+    
+    def __init__(self, session=None, parent=None,
+                 admin_st='enabled', severity='notifications'):
+        
+        self._session= session
+        self._parent = parent
+        self.admin_st = admin_st
+        self.severity = severity
+        # monitor logging object name
+        self.object = 'syslogTermMonitor'
+    
+    def get(self, session=None):
+        
+        if not session:
+            session = self._session
+        
+        query_url = '/api/mo/sys/syslog/monitor.json'
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            admin_st = ret[self.object]['attributes']['adminState']
+            severity = ret[self.object]['attributes']['severity']
+            return LogMonitor(admin_st=admin_st, severity=severity)
+
+    def _get_attributes(self):
+        att = {}
+        att['adminState'] = self.admin_st
+        att['severity'] = self.severity
+        return att
+    
+    def get_json(self):
+        return { self.object: { "attributes": self._get_attributes()}}
+
+    
+class LogConsole(object):
+    """
+    This class defines logging console
+    """
+    def __init__(self, session=None, parent=None,
+                 admin_st='enabled', severity='critical'):
+        self._session= session
+        self._parent = parent
+        self.admin_st = admin_st
+        self.severity = severity
+        # Base class object name for console logging
+        self.object = 'syslogConsole'
+    
+    def get(self, session=None):
+        
+        query_url = '/api/mo/sys/syslog/console.json'
+        if not session:
+            session = self._session
+            
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            admin_st = ret[self.object]['attributes']['adminState']
+            severity = ret[self.object]['attributes']['severity']
+            return LogConsole(admin_st=admin_st, severity=severity)
+    
+    def _get_attributes(self):
+        att = {}
+        att['adminState'] = self.admin_st
+        att['severity'] = self.severity
+        return att
+
+    def get_json(self):
+        return { self.object: { "attributes": self._get_attributes()}}  
+
+
+class LogServer(object):
+    """
+    This class defines server logging
+    """
+    def __init__(self, session=None, parent=None,
+                 host=None, severity='notifications', vrf_name='',
+                 fwd_facility='local7'):
+        self._session= session
+        self._parent = parent
+        self.host = host
+        self.severity = severity
+        self.vrf_name = vrf_name
+        self.fwd_facility = fwd_facility
+        self.object = 'syslogRemoteDest'
+
+    def get(self, session=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return LogServer object
+        """
+        query_url = '/api/node/class/syslogSyslog.json?rsp-subtree=full'
+        if not session:
+            session = self._session
+            
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            children = ret['syslogSyslog']['children']
+            for child in children:
+                if child.get(self.object):
+                    host = child[self.object]['attributes']['host']
+                    severity = child[self.object]['attributes']['severity']
+                    vrf_name = child[self.object]['attributes']['vrfName']
+                    fwd_facility = child[self.object]['attributes']\
+                    ['forwardingFacility']
+                    return LogServer(host=host, severity=severity,
+                                     vrf_name=vrf_name,
+                                     fwd_facility=fwd_facility)
+
+    def _get_attributes(self):
+        att = {}
+        att['host'] = self.host
+        att['severity'] = self.severity
+        att['vrfName'] = self.vrf_name
+        att['forwardingFacility'] = self.fwd_facility
+        return att
+    
+    def get_json(self):
+        return { self.object: { "attributes": self._get_attributes()}}
+
+
+class LogSourceInterface(object):
+    """
+    This class defines source interface logging
+    """
+    def __init__(self, session=None, parent=None,
+                 admin_st='enabled', if_name='unspecified'):
+        self._session= session
+        self._parent = parent
+        self.admin_st = admin_st
+        self.if_name = if_name
+        self.object = 'syslogSourceInterface'
+
+    def get(self, session=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return LogSourceInterface object
+        """
+        query_url = '/api/mo/sys/syslog/source.json'
+        if not session:
+            session = self._session
+            
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            admin_st = ret[self.object]['attributes']['adminState']
+            if_name = ret[self.object]['attributes']['ifName']
+            return LogSourceInterface(admin_st=admin_st, if_name=if_name)
+    
+    def _get_attributes(self):
+        
+        att = {}
+        att['adminState'] = self.admin_st
+        att['ifName'] = self.if_name
+        return att
+    
+    def get_json(self):
+        return { self.object: { "attributes": self._get_attributes()}}
+
+
+class LogLevel(object):
+    """
+    This class defines log level
+    """
+    
+    def __init__(self, session=None, parent=None,
+                 facility=None, severity='errors'):
+        self._session= session
+        self._parent = parent
+        self.facility = facility
+        self.severity = severity
+        self.object = 'syslogLevel'
+
+    def get(self, session=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return LogLevel object
+        """
+        query_url = '/api/node/class/syslogSyslog.json?rsp-subtree=full'
+        if not session:
+            session = self._session
+            
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            children = ret['syslogSyslog']['children']
+            for child in children:
+                if child.get(self.object):
+                    facility = child[self.object]['attributes']['facility']
+                    severity = child[self.object]['attributes']['severity']
+                    return LogLevel(facility=facility, severity=severity)
+  
+    def _get_attributes(self):
+        att = {}
+        att['facility'] = self.facility
+        att['severity'] = self.severity
+        return att
+    
+    def get_json(self):
+        return {self.object : { "attributes" : self._get_attributes()}}    
+
+
+class Logging(BaseNXObject):
+    """
+    This is the parent class for all the logging classes
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(Logging, self).__init__(name="logging")
+        self._session = session
+        self._parent = parent
+        self._children = []
+        # Base syslog object
+        self.object  = 'syslogSyslog'
+        
+        self.timestamp = LogTimeStamp(session=session, parent=self)
+        self.level = LogLevel(session=session, parent=self)
+        self.server = LogServer(session=session, parent=self)
+        self.monitor = LogMonitor(session=session, parent=self)
+        self.src_iface = LogSourceInterface(session=session, parent=self)
+        self.console = LogConsole(session=session, parent=self)
+
+    def add_log(self, log_obj=None):
+        self._children.append(log_obj)
+    
+    def get_json(self):
+        return super(Logging, self).get_json(self.object)
+    
+    def get_url(self, fmt='json'):
+        return '/api/mo/sys/syslog.' + fmt
+  
+    @classmethod
+    def get(cls, session=None):
+        """
+        :param session: Session object used to communicate with Switch
+        :return Logging object
+        """
+        
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        return Logging(session=session)
+
+
+class BreakoutPort(object):
+    """
+    This class defines breakout ports
+    """
+    def __init__(self, id=None, map=None, session=None, parent=None):
+        self.id = id
+        self.map = map
+        self.object = 'imFpP'
+        self._session = session
+        self._parent = parent
+    
+    def get_json(self):
+        return {self.object : {'attributes' : self._get_attributes()}}
+        
+    def _get_attributes(self):
+        att = {}
+        if not self.id:
+            raise AttributeError('Port id required')
+        
+        att['id'] = self.id
+        att['breakoutMap'] = self.map
+        return att
+
+    def get(self, port=None, session=None):
+        
+        if not session:
+            session = self._session
+
+        query_url = ('/api/mo/sys/breakout/module-%s.json?query-target'
+                     '=children' % (self._parent.module_num))
+        ret = []
+        ports = session.get(query_url).json()['imdata']
+        for port in ports:
+            id = str(port['imFpP']['attributes']['id'])
+            map = str(port['imFpP']['attributes']['breakoutMap'])
+            ret.append(BreakoutPort(id, map, session=session))
+        return ret
+
+
+class BreakoutModule(BaseNXObject):
+    """
+    This class defines breakout modules
+    """
+    
+    def __init__(self, module_num=None, session=None, parent=None):
+        
+        if not module_num:
+            raise TypeError('Module id expected')
+        
+        super(BreakoutModule, self).__init__(name=module_num)
+        self._session = session
+        self._parent = parent
+        self.module_num = module_num
+        self.object = 'imMod'
+        self.ports = BreakoutPort(session=session, parent=self)
+
+    def add_port_map(self, id=None, map=None):
+        """
+        :param id: String reprenenting id (example 1, 45 etc.)
+        :param map: String map (Example: 10g-4x)
+        """
+        if not isinstance(map, str):
+            raise TypeError('str instance is expected for map')
+        try:
+            int(id)
+        except ValueError:
+            raise ValueError('Invalid port Id')
+
+        self._children.append(BreakoutPort(id, map))
+
+    def _get_attributes(self):
+        att = {}
+        att['id'] = self.module_num
+        return att
+    
+    def get_json(self):
+        return super(BreakoutModule,
+                     self).get_json(self.object,
+                                    attributes=self._get_attributes())
+
+    def get(self, module_num=None, session=None):
+        """
+        Get break module info
+        :param module_num String representing number
+        :param Session object used for communicating with switch
+        :return List of BreakoutModule objects
+        """
+        if not session:
+            session = self._session
+        
+        if module_num:
+            query_url = '/api/mo/sys/breakout/module-%s.json' % (module_num)
+        else:
+            query_url = '/api/mo/sys/breakout.json?query-target=children'
+        
+        modules = session.get(query_url).json()['imdata']
+        ret = []
+        for module in modules:
+            if module.get('imMod'):
+                module_num = str(module['imMod']['attributes']['id'])
+                ret.append(BreakoutModule(module_num, session=session))
+        return ret
+            
+
+class InterfaceBreakout(BaseNXObject):
+
+    def __init__(self, session=None):
+        super(InterfaceBreakout, self).__init__(name='')
+        self._session = session
+        self.object = 'imBreakout'
+        
+        # id (1) passed here does not make any impact
+        self.modules = BreakoutModule('1', session=session, parent=self)
+    
+    def add_module(self, module):
+        if not isinstance(module, BreakoutModule):
+            raise TypeError('BreakoutModule instance expected')
+        self._children.append(module)
+    
+    def get_json(self):
+        return super(InterfaceBreakout, self).get_json(self.object)
+    
+    def get_url(self, fmt='json'):
+        return '/api/mo/sys/breakout.' + fmt
+    
+    def get_delete_url(self, module=None, port=None):
+        return '/api/mo/sys/breakout/module-%s/fport-%s.json' % (module, port)
+    
+    @classmethod
+    def get(cls, session=None, module=None, port=None):
+
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+
+        return InterfaceBreakout(session)
+
+
+class SVI(BaseNXObject):
+    """
+    This class defines SVI
+    """
+    def __init__(self, vlan=None, admin_st=None, descr=None):
+
+        if not vlan:
+            raise TypeError('Proper vlan name expected')
+        try:
+            # A dummy line which raises error if vlan is otherthan 
+            # vlan<ID> format
+            int(vlan.replace('vlan', ''))
+        except ValueError:
+            raise AttributeError('Proper vlan name expected')
+        
+        super(SVI, self).__init__(name=vlan)
+        self.id = vlan #vlan id
+        self.descr = descr
+        self.admin_st = admin_st
+        self.mtu = None
+        self.bw = None
+        self.object = 'sviIf'
+    
+    def set_bw(self, bw=None):
+        self.bw = bw
+    
+    def set_mtu(self, mtu=None):
+        self.mtu = mtu
+    
+    def get_mtu(self):
+        return self.mtu
+    
+    def get_bw(self):
+        return self.bw
+
+    def get_url(self, fmt='json'):
+        return '/api/mo/sys/intf/svi-[%s].%s'  % (self.id, fmt)
+    
+    def get_delete_url(self, vlan=None):
+        return '/api/mo/sys/intf/svi-[%s].json'  % (vlan)
+    
+    def _get_attributes(self):
+        att = {}
+        att['id'] = self.id
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        if self.descr:
+            att['descr'] = self.descr
+        if self.mtu:
+            att['mtu'] = self.mtu
+        if self.bw:
+            att['bw'] = self.bw
+        return att
+    
+    def get_json(self):
+        return super(SVI, self).get_json(self.object,
+                                  attributes=self._get_attributes())
+    
+    @classmethod
+    def get(cls, session=None, vlan=None):
+        """
+        Get SVI details 
+        :param session: Session instance to commnunicate with switch
+        :param vlan: String represents svi id i.e. valn10
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        if vlan:
+            query_url = '/api/mo/sys/intf/svi-[%s].json' % (vlan)
+        else:
+            query_url = '/api/node/class/sviIf.json'
+        
+        svis = session.get(query_url).json()['imdata']
+        resp = []
+        for svi in svis:
+            admin_st = str(svi['sviIf']['attributes']['adminSt'])
+            id = str(svi['sviIf']['attributes']['id'])
+            mtu = str(svi['sviIf']['attributes']['mtu'])
+            desc = str(svi['sviIf']['attributes']['descr'])
+            bw = str(svi['sviIf']['attributes']['bw'])
+            svi_obj = SVI(id, admin_st, desc)
+            svi_obj.set_mtu(mtu)
+            svi_obj.set_bw(bw)
+            resp.append(svi_obj)
+        
+        return resp
+
+
+class ConfigInterfaces(BaseNXObject):
+    """This class is used to configure multiple interfaces/svi/port channel
+    at a time.
+    """
+    
+    def __init__(self, session=None):
+        super(ConfigInterfaces, self).__init__(name='')
+        self.object = 'interfaceEntity'
+
+    def add_interface(self, interface=None):
+        """Form the list of interfaces to be configured"""
+        if not isinstance(interface, Interface):
+            raise TypeError('Interface instance is expected')
+        self._children.append(interface)
+    
+    def add_svis(self, svi=None):
+        """Form list of SVIs"""
+        if not isinstance(svi, SVI):
+            raise TypeError('SVI instance expected')
+        self._children.append(svi)
+    
+    def add_port_channel(self, pc=None):
+        """Form list of PortChannel"""
+        if not isinstance(pc, PortChannel):
+            raise TypeError('PortChannel instance expected')
+        self._children.append(pc)
+
+    def get_url(self, fmt='json'):
+        return '/api/node/mo/sys/intf.json'
+    
+    def get_json(self):
+        return super(ConfigInterfaces, self).get_json(self.object,
+                                                      attributes={})
+
+  
+class VrrpID(object):
+    """
+    This class defines VRRP ID
+    """
+    
+    def __init__(self, vrrp_id=None, secondary_ip=None, session=None,
+                 parent=None):
+        if not vrrp_id:
+            raise TypeError('vrrp_id is not provided')
+        #VRRP ID interface object
+        self.object = 'vrrpId'
+        self.vrrp_id = vrrp_id
+        self.admin_st = None
+        self.priority = None
+        self._primary_ip = None
+        self.interface = None
+        #VRRP Secondary object
+        self.child_object = 'vrrpSecondary'
+        self._secondary_ip = secondary_ip
+        
+        self._session= session
+        self._parent = parent
+        
+    def set_admin_st(self, admin_st=None):
+        self.admin_st = admin_st
+        
+    def get_admin_st(self):
+        """
+       :returns: admin state object
+        """
+        return self.admin_st
+    
+    def set_priority(self, priority=None):
+        self.priority = priority
+        
+    def get_priority(self):
+        """
+       :returns: priority object
+        """
+        return self.priority
+    
+    def set_primary(self, primary_ip=None):
+        self._primary_ip = primary_ip
+        
+    def get_primary(self):
+        """
+       :returns: primary ip object
+        """
+        return self._primary_ip
+    
+    def set_secondary(self, secondary_ip=None):
+        self._secondary_ip = secondary_ip
+        
+    def get_secondary(self):
+        """
+       :returns: secondary ip object
+        """
+        return self._secondary_ip
+    
+    def set_interface(self, interface):
+        self.interface = interface
+        
+    def get_interface(self):
+        return self.interface
+    
+    def _get_attributes(self):
+        att = {}
+        if self.vrrp_id:
+            att['id'] = self.vrrp_id
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        if self.priority:
+            att['priCfg'] = self.priority
+        if self._primary_ip:
+            att['primary'] = self._primary_ip
+        return att
+    
+    def _get_child_attributes(self):
+        child = []
+        if self._secondary_ip:
+            child.append({self.child_object: 
+                            {"attributes": 
+                                {'secondary': self._secondary_ip}}})
+        return child
+    
+    def get_json(self):
+        return {self.object : { "attributes" : self._get_attributes(), 
+                                "children" : self._get_child_attributes()}}
+
+     
+class Vrrp(BaseNXObject):
+    """
+    This defines the VRRP Interface 
+    """
+    
+    def __init__(self, interface=None, session=None, parent=None,
+                 vrrp_id=None):
+        super(Vrrp, self).__init__(name="vrrp_interface")
+        if not interface:
+            raise TypeError('interface is not provided')
+        # Base VRRP interface object
+        self.object  = 'vrrpInterface'
+        self.interface = interface
+        self.admin_st = None
+        self.descr = None
+        
+        self._session = session
+        self._parent = parent
+        # id ('1') passed here does not make any impact
+        self.vrrp_id = VrrpID('1', session=session, parent=self)
+        self.vrrp_ids = []
+    
+    def set_admin_st(self, admin_st=None):    
+        self.admin_st = admin_st
+        
+    def get_admin_st(self):
+        """
+       :returns: admin state object
+        """
+        return self.admin_st
+    
+    def set_descr(self, descr=None):
+        self.descr = descr
+        
+    def get_descr(self):
+        """
+       :returns: description object
+        """
+        return self.descr
+           
+    def add_vrrp_id(self, vrrp_id=None):
+        if isinstance(vrrp_id, VrrpID): 
+            self._children.append(vrrp_id)
+            self.vrrp_ids.append(vrrp_id)
+               
+    def _get_attributes(self):
+        att = {}
+        if self.interface.if_name:
+            att['id'] = self.interface.if_name
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        if self.descr:
+            att['descr'] = self.descr
+        return att
+        
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(Vrrp, self).get_json(obj_class=self.object, 
+                                          attributes=self._get_attributes())
+                                          
+    def get_url(self, fmt='json'):
+        """
+       :returns: url object
+        """
+        return '/api/node/mo/sys/vrrp/inst.' + fmt
+    
+    @classmethod
+    def get(self, session=None, interface_str=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return Vrrp object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        ret_data = []
+        object = 'vrrpInterface'
+        
+        if interface_str:
+            query_url = '/api/node/mo/sys/vrrp/inst/if-['+interface_str+'].json?rsp-subtree=full'
+            resp = session.get(query_url).json()['imdata']
+        else:
+            query_url = '/api/node/mo/sys/vrrp/inst.json?rsp-subtree=full'
+            data = session.get(query_url).json()['imdata'][0]
+            resp = data['vrrpInst']['children']
+        
+        for ret in resp:
+            interface =ret[object]['attributes']['id'] 
+            admin_st = ret[object]['attributes']['adminSt']
+            descr = ret[object]['attributes']['descr']
+            vrrp = Vrrp(interface=interface)
+            if ret[object].get('children'):
+                
+                for id in ret[object].get('children'):
+                    vrrp_id = id['vrrpId']['attributes']['id']
+                    admin_st = id['vrrpId']['attributes']['adminSt']
+                    priority = id['vrrpId']['attributes']['priCfg']
+                    primary_ip = id['vrrpId']['attributes']['primary']
+                    vrrp_id = VrrpID(vrrp_id=vrrp_id)
+                    vrrp_id.set_admin_st(admin_st)
+                    vrrp_id.set_priority(priority)
+                    vrrp_id.set_primary(primary_ip)
+                    
+                    vrrp_id.set_secondary('-')
+                    if id['vrrpId'].get('children'):
+                        for sec in id['vrrpId']['children']:
+                            sec_ip = sec['vrrpSecondary']['attributes']['secondary']
+                            vrrp_id.set_secondary(sec_ip)
+                            
+                    vrrp.add_vrrp_id(vrrp_id)
+      
+            vrrp.set_admin_st(admin_st)
+            vrrp.set_descr(descr)
+            ret_data.append(vrrp)        
+        return ret_data
+
+     
+class ConfigVrrps(BaseNXObject):
+    """
+    This is the base class to configure multiple VRRP Interface classes
+    """
+    
+    def __init__(self, session=None):
+        super(ConfigVrrps, self).__init__(name='')
+        self._session = session 
+        self.object = 'vrrpInst'
+        
+        # id ('1') passed here does not make any impact
+        self.vrrp_id = VrrpID('1', session=session, parent=self)
+        # interface ('1') passed here does not make any impact
+        self.vrrp = Vrrp('1', session=session, parent=self)
+
+    def add_vrrp(self, module):
+        if not isinstance(module, Vrrp):
+            raise TypeError('ConfigVrrps instance expected')
+        self._children.append(module)
+        
+    def get_url(self, fmt='json'):
+        """
+       :returns: url object
+        """
+        return '/api/node/mo/sys/vrrp/inst.' + fmt   
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(ConfigVrrps, self).get_json(self.object) 
+        
+    @classmethod
+    def get(cls, session=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return ConfigVrrps object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        return ConfigVrrps(session)        
+                  
+
+class Lacp(BaseNXObject):
+    """
+    This class defines lacp configuration
+    """
+    
+    def __init__(self, rate=None, interface=None, session=None,
+                 parent=None):
+        super(Lacp, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.rate = rate
+        self.interface = interface
+        self.object = 'lacpIf'
+        
+    @classmethod
+    def get(self, session=None, interface=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return Lacp object
+        """
+        if interface:
+            query_url = ('/api/node/mo/sys/lacp/inst/if-['+interface+'].'
+                         'json?query-target=self')
+        else:
+            query_url = ('/api/node/mo/sys/lacp/inst.json?query-'
+                         'target=children')
+        ret_data = []
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+          
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            rate = ret['lacpIf']['attributes']['txRate']
+            interface = ret['lacpIf']['attributes']['id']
+            lacp = Lacp(rate=rate, interface=interface)
+            ret_data.append(lacp)
+        return ret_data
+            
+    def _get_attributes(self):
+        att = {}
+        att['txRate'] = self.rate
+        att['id'] = self.interface.if_name
+        return att
+    
+    def get_url(self):
+        return '/api/node/mo/sys/lacp/inst.json?query-target=children'
+    
+    def get_json(self):
+        return super(Lacp, self).get_json(self.object,
+                                          attributes=self._get_attributes())       
+
+
+class IPV6Interface(BaseNXObject):
+    """
+    This class defines ipv6s of an interface. 
+    """
+    def __init__(self, if_name, session=None, parent=None):
+        """
+        :param if_name: String representing interface i.e. eth1/2
+        """
+        if not isinstance(if_name, str):
+            raise TypeError('str instance expected')
+        
+        self._session = session
+        self.interface = if_name
+        self.object = 'ipv6If'
+        self._addresses = []
+        self.if_name = if_name
+        self.admin_st = None
+        self.link_local_addr = None
+        super(IPV6Interface, self).__init__(name=self.if_name)
+    def get_if_name(self):
+        return self.if_name
+
+    def set_admin_st(self, state):
+        self.admin_st = state
+    
+    def get_admin_st(self):
+        return self.admin_st
+    
+    def get_descr(self):
+        return self.descr
+ 
+    def set_descr(self, desc):
+        self.descr = desc
+
+    def add_address(self, addr):
+        self._addresses.append(addr)
+    
+    def get_address(self):
+        return self._addresses
+
+    def _get_attributes(self):
+        att = {}
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        if self.descr:
+            att['descr'] = self.descr
+        att['id'] = self.if_name
+        return att
+    
+    def _get_json(self, class_obj, att=None):
+        if not att:
+            att = {}
+        return {class_obj : {'attributes' : att}}
+    
+    def set_link_local_addr(self, addr):
+        self.link_local_addr = addr
+
+    def get_json(self):
+        resp = super(IPV6Interface,
+                     self).get_json(self.object,
+                                    attributes=self._get_attributes())
+        addrs = []
+        for addr in self._addresses:
+            att = {'addr': addr}
+            addrs.append(self._get_json('ipv6Addr', att))
+        
+        if self.link_local_addr:
+            att = {'addr': self.link_local_addr}
+            addrs.append(self._get_json('ipv6LLaddr', att))
+
+        resp[self.object]['children'] = addrs
+        return resp
+    
+    def get_url(self, fmt='json'):
+        return ('/api/node/mo/sys/ipv6/inst/dom-default/if-[%s].%s'
+                % (self.interface.if_name, fmt))
+
+    def get(self, session=None):
+        """
+        This method is used form get() method of IPV6 class
+        :param sessoin: Session instance
+        """
+        if not session:
+            session = self._session
+        query_url = ('/api/node/mo/sys/ipv6/inst/dom-default/if-[%s].json'
+                     '?query-target=children' % (self.if_name))
+        
+        resp = session.get(query_url).json()['imdata']
+        for addr in resp:
+            if addr.get('ipv6Addr'):
+                address = str(addr['ipv6Addr']['attributes']['addr'])
+                self.add_address(address)
+            if addr.get('ipv6LLaddr'):
+                self.link_local_addr = str(addr['ipv6LLaddr']['attributes']
+                                           ['addr'])
+                self.add_address(self.link_local_addr)
+
+
+class IPV6NextHop(object):
+    """This class defines IPv6 nexthop"""
+    def __init__(self, addr, interface, vrf, track_id, tag):
+        self.addr = addr
+        self.i_face = interface
+        self.vrf = vrf
+        self.track_id = track_id
+        self.tag = tag
+        self.object = 'ipv6Nexthop'
+    
+    def _get_attributes(self):
+        att = {}
+        att['nhAddr'] = self.addr
+        if self.i_face:
+            att['nhIf'] = self.i_face
+        if self.vrf:
+            att['nhVrf'] = self.vrf
+        if self.track_id:
+            att['object'] = self.track_id
+        if self.tag:
+            att['tag'] = self.tag
+        return att
+        
+    def get_json(self):
+        return {self.object : { 'attributes': self._get_attributes()}}
+
+
+class IPV6Route(BaseNXObject):
+
+    def __init__(self, prefix, name=None, parent=None, session=None):
+        
+        if not IPV6.is_valid_ipv6_address(prefix.split('/')[0]):
+            raise TypeError('Invalid prefix')
+        if not name:
+            name = ''
+
+        self._session = session
+        super(IPV6Route, self).__init__(name=name, parent=parent)
+        self.prefix = prefix
+        self.object = 'ipv6Route'
+        self.next_hops = []
+
+    def get_json(self):
+        return super(IPV6Route, self).get_json(self.object,
+                                            attributes=self._get_attributes())
+    
+    def _get_attributes(self):
+        att = {}
+        att['prefix'] = self.prefix
+        return att
+    
+    def add_next_hop(self, addr, interface=None, vrf=None, track_id=None,
+                     tag=None):
+
+        if not IPV6.is_valid_ipv6_address(addr):
+            raise TypeError('Invalid prefix')
+        
+        if not isinstance(interface, (Interface, PortChannel)):
+            raise TypeError('Interface or PortChannel instance expected')
+        
+        if not vrf:
+            vrf = 'default'
+        next_hop = IPV6NextHop(addr, interface.if_name, vrf, track_id, tag)
+        self._children.append(next_hop)
+        self.next_hops.append(interface)
+    
+    def get(self, session=None):
+        """"
+        Get all the nexthop details from the switch and form a list of
+        nexthops and store it in self.next_hops list
+        :param session: Session object to communicate with Switch
+        :return None
+        """
+        if not isinstance(session, Session):
+            session = self._session
+        
+        query_url = '/api/node/mo/sys/ipv6/inst/dom-%s/rt-[%s].json?query-target=children' %\
+        (self._parent.domain, self.prefix)
+        resp = session.get(query_url).json()['imdata']
+        for n_hop in resp:
+            if n_hop.get('ipv6Nexthop'):
+                n_hop_obj = 'ipv6Nexthop'
+                addr = n_hop[n_hop_obj]['attributes']['nhAddr']
+                i_face = n_hop[n_hop_obj]['attributes']['nhIf']
+                vrf = n_hop[n_hop_obj]['attributes']['nhVrf']
+                track_id = n_hop[n_hop_obj]['attributes']['object']
+                tag = n_hop[n_hop_obj]['attributes']['tag']
+                next_hop = IPV6NextHop(addr, i_face, vrf, track_id, tag)
+                self.next_hops.append(next_hop)
+
+
+class IPV6(BaseNXObject):
+    """
+    This class defines IPv6
+    """
+    def __init__(self, name=None, session=None, parent=None):
+        """
+        :param name: String 
+        :param session: Session instance used for communicating with switch
+        :param parent: parent class of this class
+        """
+        self._session = session
+        self._parent = parent
+        if not name:
+            name = 'default'
+        super(IPV6, self).__init__(name=name)
+        self.i_faces = []
+        self.cls_object = 'ipv6Dom'
+        self.domain = name
+        
+        self.interfaces = []
+        self.routes = []
+    
+    def get_url(self, fmt='json'):
+        return '/api/node/mo/sys/ipv6/inst/dom-%s.%s' % ( self.domain, fmt)
+    
+    def get_delete_url(self, i_face, fmt='json'):
+        return '/api/node/mo/sys/ipv6/inst/dom-%s/if-[%s].%s' % (self.domain,
+                                                                 i_face, fmt)
+    
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.domain
+        return att
+    
+    @classmethod
+    def is_valid_ipv6_address(cls, address):
+        try:
+            socket.inet_pton(socket.AF_INET6, address)
+        except socket.error:  # not a valid address
+            return False
+        return True
+    
+    def add_interface_address(self, interface, addr, link_local=None):
+        """
+        :param interface: Interface instance
+        :param addr: String representing ipv6
+        :param link_local: string representing link local address
+        """
+        if not isinstance(interface, (Interface, PortChannel)):
+            raise TypeError('Interface or PortChannel instance expected')
+        
+        if not IPV6.is_valid_ipv6_address(addr.split('/')[0]):
+            raise TypeError('Invalid address')
+        
+        if link_local and not IPV6.is_valid_ipv6_address(link_local):
+            raise TypeError('Invalid address')
+        
+        if interface.if_name in self.i_faces:
+            for ipv6_int in self._children:
+                if ipv6_int.if_name == interface.if_name:
+                    ipv6_int.add_address(addr)
+                if link_local:
+                    ipv6_int.set_link_local_addr(link_local)
+        else:
+            ipv6_int = IPV6Interface(interface.if_name, parent=self)
+            if link_local:
+                ipv6_int.set_link_local_addr(link_local)
+            ipv6_int.add_address(addr)
+            self._children.append(ipv6_int)
+            self.i_faces.append(interface.if_name)
+    
+    def add_route(self, route):
+        """Add route capability to the configuration"""
+        if not isinstance(route, IPV6Route):
+            raise TypeError('IPV6Route instance expected')
+        self._children.append(route)
+        self.routes.append(route)
+    
+    def get_json(self):
+        return super(IPV6, self).get_json(self.cls_object,
+                                          attributes=self._get_attributes())
+
+    @classmethod
+    def get(cls, session, interface=None, domain=None):
+        """
+        Get IPv6 details (interface / route)
+
+        :param session: Session instance to commnunicate with switch
+        :param interface: String represents interface i.e. ethx/y
+        :return IPV6 object after storing interface and route details
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        if not domain:
+            domain = 'default'
+        if interface:
+            if 'eth' not in interface:
+                raise TypeError('Not a valid interface')
+
+            query_url = ('/api/node/mo/sys/ipv6/inst/dom-%s/if-[%s].json' 
+                         % (domain, interface))
+        else:
+            query_url = ('/api/node/mo/sys/ipv6/inst/dom-%s.json?'
+                         'query-target=children' % (domain))
+        
+        resp = session.get(query_url).json()['imdata']
+        
+        ipv6 = IPV6(domain)
+        for ifs in resp:
+            if ifs.get('ipv6If'):
+                if_name = str(ifs['ipv6If']['attributes']['id'])
+                admin_st = str(ifs['ipv6If']['attributes']['adminSt'])
+                desc = str(ifs['ipv6If']['attributes']['descr'])
+                ret_int = IPV6Interface(if_name, session=session)
+                ret_int.set_admin_st(admin_st)
+                ret_int.set_descr(desc)
+                ret_int.get()
+                ipv6.interfaces.append(ret_int)
+                
+            if ifs.get('ipv6Route'):
+                prefix = str(ifs['ipv6Route']['attributes']['prefix'])
+                route  = IPV6Route(prefix, parent=ipv6, session=session)
+                route.get()
+                ipv6.routes.append(route)
+
+        return ipv6
+
+
+class FeatureAttributes(object):
+    """
+    This class defines the attributes specific feature
+    """
+    
+    def __init__(self, feature=None, session=None, parent=None):
+        self._session= session
+        self._parent = parent
+        self.admin_st = None
+        self.instance = None
+        if feature:
+            self.name = feature.lower()[2:]
+            self.object = 'fm' + feature.title().replace('-','')
+
+    def set_admin_st(self, admin_st):
+        self.admin_st = admin_st
+    
+    def get_admin_st(self):
+        return self.admin_st
+        
+    def set_instance(self, instance):
+        self.instance = instance
+    
+    def get_instance(self):
+        return self.instance        
+  
+    def _get_attributes(self):
+        att = {}
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        return att
+        
+    def get_json(self):
+        return {self.object : { "attributes" : self._get_attributes()}}
+    
+    
+class Feature(BaseNXObject):
+    """
+    This defines the feature class
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(Feature, self).__init__(name="feature")
+        self._session = session
+        self._parent = parent
+        
+        # Base feature object
+        self.object  = 'fmEntity'
+    
+    def enable(self, feature):
+        feature_obj = FeatureAttributes(feature)
+        feature_obj.set_admin_st('enabled')
+        self._children.append(feature_obj)
+        
+    def disable(self, feature):
+        feature_obj = FeatureAttributes(feature)
+        feature_obj.set_admin_st('disabled')
+        self._children.append(feature_obj)
+        
+    def get_json(self):
+        return super(Feature, self).get_json(self.object)
+    
+    def get_url(self, fmt='json'):
+        return '/api/mo/sys/fm.' + fmt
+    
+    def get(self, session=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return List of Feature objects
+        """
+        if not session:
+            session = self._session
+    
+        query_url = '/api/mo/sys/fm.json?rsp-subtree=full'
+        ret_data = []   
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            children = ret[self.object]['children']
+            for child in children:
+                for key in child:
+                    admin_st = child[key]['attributes']['adminSt']
+                    instance = child[key]['attributes']['maxInstance']
+                    feature = FeatureAttributes(key)
+                    feature.set_admin_st(admin_st)
+                    feature.set_instance(instance)
+                    ret_data.append(feature)
+
+        return ret_data

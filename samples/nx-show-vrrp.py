@@ -17,40 +17,46 @@
 #    under the License.                                                        #
 #                                                                              #
 ################################################################################
+from nxtoolkit.nxtoolkit import Vrrp
 """
-Simple application that shows all of the processes running on a switch
+Sample of configuring logging parameters
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
-
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile    
+    description = 'Simple application that shows the Switch\
+                    vrrp configuration'
+    creds = NX.Credentials('switch', description)
     args = creds.get()
-
+    
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
+    
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
-
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
+        
+    template = "{0:16} {1:16} {2:16} {3:16} {4:16}"
+    print(template.format("Interface", "VRRP ID", "priority", "Primary ip", 
+                              "secondary ip"))
+    print(template.format("------------", "------------", "------------",
+                              "------------", "------------"))
+    
+    # To get details of vrrp of all the interfaces 
+    for vrrp in NX.Vrrp.get(session):
+        for id in vrrp.vrrp_ids:
+            print(template.format(vrrp.interface, id.vrrp_id, id.get_priority(), 
+                                   id.get_primary(), id.get_secondary()))
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main() 

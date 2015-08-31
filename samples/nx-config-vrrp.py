@@ -18,39 +18,73 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that shows all of the processes running on a switch
+Sample of configuring VRRP parameters
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
-
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile    
+    description = '''Simple application that logs on to the 
+            Switch and configure VRRP'''
+    creds = NX.Credentials('switch', description)
     args = creds.get()
-
+    
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
+    
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
+         
+    # Object to create multiple VRRP's
+    vrrp = NX.ConfigVrrps(session)
+    
+    # Create interface object
+    int1 = NX.Interface('eth1/12')
+    
+    # Make it L3 interface
+    int1.set_layer('Layer3')
+    
+    # Push interface configuration to the switch
+    resp = session.push_to_switch(int1.get_url(), int1.get_json())
+    if not resp.ok:
+        print('%% Error: Could not push configuration to Switch')
+        print(resp.text)
+    
+    # Create VRRP object for interface
+    vrrp_int1 = NX.Vrrp(int1)
 
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
+    #create vrrpID
+    vrrp_id1 = NX.VrrpID('50')
+    
+    # Set the parameter in VrrpID
+    vrrp_id1.set_primary('10.10.0.11')
+    vrrp_id1.set_secondary('10.10.1.12')
 
-
+    # Attach vrrpID to vrrp interface
+    vrrp_int1.add_vrrp_id(vrrp_id1)
+    
+    # Attach the modules to VRRP object
+    vrrp.add_vrrp(vrrp_int1)
+    
+    # Uncomment the below two lines to print url and json response
+    # print vrrp.get_url()
+    # print vrrp.get_json()
+           
+    # Push entire configuration to the switch
+    resp = session.push_to_switch(vrrp.get_url(), vrrp.get_json())
+    if not resp.ok:
+        print('%% Error: Could not push configuration to Switch')
+        print(resp.text)
+        
+    
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()    

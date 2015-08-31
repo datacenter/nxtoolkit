@@ -18,39 +18,53 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that shows all of the processes running on a switch
+Simple application to login into the switch and configure lacp rate on
+the interface
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
-#import nxtoolkit.nxphysobject as NX_PHYS
-from nxtoolkit.nxtoolkitlib import Credentials
-
 
 def main():
     """
-    Main show Process routine
+    Main execution routine
+
     :return: None
     """
-    description = '''Simple application that logs on to the Switch and
-                displays process information for a switch'''
-    creds = Credentials('switch', description)
+    # Take login credentials from the command line if provided
+    # Otherwise, take them from your environment variables file ~/.profile    
+    description = '''Simple application to login into the switch and configure
+                    lacp rate on the interface'''
+    creds = NX.Credentials('switch', description)
     args = creds.get()
-
+    
+    # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
+    
     resp = session.login()
     if not resp.ok:
-        print '%% Could not login to Switch'
+        print('%% Could not login to Switch')
         sys.exit(0)
-
-    switch = NX.Node.get(session)
-    processes = NX.Process.get(session, switch)
-    tables = NX.Process.get_table(processes, 'Process list for Switch ::')
-    for table in tables:
-        print table.get_text(tablefmt='fancy_grid') + '\n'
-
+    
+    int1 = NX.Interface('eth1/2')
+    lacp = NX.Lacp(rate='fast', interface=int1, session=session)
+           
+    # Push entire configuration to switch
+    resp = session.push_to_switch(lacp.get_url(), lacp.get_json())
+    if not resp.ok:
+        print('%% Error: Could not push configuration to Switch')
+        print(resp.text)
+        
+    # Uncomment below line to get the configuration of all interfaces from
+    # switch get_data = NX.Lacp.get(session)
+    
+    # Get LACP rate configuration from the switch
+    get_data = NX.Lacp.get(session)
+    template = "{0:16} {1:16}"
+    print(template.format("Interface", "rate"))
+    print(template.format("-------------", "-------------"))
+    for data in get_data:
+        print(template.format(data.interface, data.rate))
+        
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main() 

@@ -18,8 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and displays all
-of the Interfaces.
+Simple application that logs on to the Switch and displays the cdp neighbors.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -33,7 +32,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = 'Simple application that logs on to the Switch and displays all of the Interfaces.'
+    description = '''Simple application that logs on to the Switch and 
+                displays the cdp neighbors'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -44,23 +44,26 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
 
-    # Download all of the interfaces
-    # and store the data as tuples in a list
+    cdp_detail = NX.LinkNeighbors.get(session)
     data = []
-    interfaces = NX.Interface.get(session)
-    for interface in interfaces:
-        data.append((interface.attributes['if_name'],
-                     interface.attributes['porttype'],
-                     interface.attributes['adminstatus'],
-                     interface.attributes['operSt'],
-                     interface.attributes['speed'],
-                     interface.attributes['mtu'],
-                     interface.attributes['usage']))
+    if not len(cdp_detail):
+        print "NO CDP entry found for given interface."
+        exit()
+    else:
+        for cdp in cdp_detail:
+            data.append((cdp.attributes['devId'],
+                         cdp.attributes['id'],
+                         cdp.attributes['Hldtme'],
+                         cdp.attributes['cap'],
+                         cdp.attributes['platId'],
+                         cdp.attributes['portId']))
 
     # Display the data downloaded
-    template = "{0:17} {1:6} {2:^6} {3:^6} {4:7} {5:6} {6:9} "
-    print(template.format("INTERFACE", "TYPE", "ADMIN", "OPER", "SPEED", "MTU", "USAGE"))
-    print(template.format("---------", "----", "------", "------", "-----", "___", "---------"))
+    template = "{0:35} {1:13} {2:6} {3:40} {4:20} {5:10} "
+    print(template.format("Device-ID", "Local Iface", "Hldtme", "Capability",
+                          "Platform", "Port ID"))
+    print(template.format("---------", "-----------", "------", "----------",
+                          "--------", "--------",))
     for rec in data:
         print(template.format(*rec))
 

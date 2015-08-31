@@ -33,7 +33,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = 'Simple application that logs on to the Switch and displays all of the Interfaces.'
+    description = '''Simple application that logs on to the Switch and 
+                displays all of the Interfaces.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -61,7 +62,8 @@ def main():
             print(dom_template.format("", "Domain Name", "Router ID"))
             print(dom_template.format("", "-----------", "-------------"))
 
-            print(dom_template.format("", bgpDom.get_name(), bgpDom.get_router_id()))
+            print(dom_template.format("", bgpDom.get_name(),
+                                      bgpDom.get_router_id()))
 
             dom_peer_data = []
             dom_peer_template = "{0:5} {1:20} {2:15} {3:6}"

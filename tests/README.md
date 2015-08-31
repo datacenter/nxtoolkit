@@ -5,9 +5,9 @@ The nxtoolkit package has a unit test suite that strives for a
 minimum of 100% code coverage.  The main test suite is contained
 within the ``nxtoolkit_test.py`` file.  Within the test suite, the
 tests can be classified into 2 types; live tests and offline tests.
-Live tests are those that actually communicate with an APIC and push
-configuration to/from the APIC.  Offline tests run locally and do not
-communicate with the APIC in any way.
+Live tests are those that actually communicate with a switch and push
+configuration to/from the Switch.  Offline tests run locally and do not
+communicate with the Switch in any way.
 
 The tests are can be run in the following ways::
 
