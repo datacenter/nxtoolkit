@@ -18,6 +18,7 @@ Required
 
 * Python 2.7+
 * [setuptools package](https://pypi.python.org/pypi/setuptools)
+* NXOS version: 7.0(3)I2(1)
 
 ## Downloading
 
