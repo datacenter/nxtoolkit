@@ -46,9 +46,9 @@ def main():
         sys.exit(0)
     
     # Creating interface objects
-    # Note: interfaces should be L3
-    int1 = NX.Interface('eth1/8')
-    int2 = NX.Interface('eth1/9')
+    # Note: interfaces should be L3 interface
+    int1 = NX.Interface('eth2/1')
+    int2 = NX.Interface('eth2/3')
     
     # Create a L3 port channel
     pc1 = NX.PortChannel('211', layer='Layer3')

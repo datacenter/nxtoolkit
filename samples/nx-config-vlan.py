@@ -45,24 +45,27 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
     
-    # Create vlans
-    vlan1 = NX.L2BD('vlan-111')
-    vlan2 = NX.L2BD('vlan-222')
+    # Create L2BD objects
+    vlan1 = NX.L2BD('vlan-112')
+    vlan2 = NX.L2BD('vlan-223')
         
-    # Create L3 instance
-    l3inst = NX.L3Inst('default')
-    
+    # Create a ConfigBDs object to configure multiple l2bd at a time
+    bds = NX.ConfigBDs()
+ 
     # Attach L2DB instance or created VLANS
-    l3inst.add_l2bd(vlan1)
-    l3inst.add_l2bd(vlan2)
-    
+    bds.add_l2bds(vlan1)
+    bds.add_l2bds(vlan2)
+
     # Configures the switch
-    resp = session.push_to_switch(l3inst.get_url(), l3inst.get_json())
+    # Note: vlan1.get_json() and vlan1.get_url() methods can be used to 
+    #       configure a single vlan instead of bds.get_url(), bds.get_json()
+    resp = session.push_to_switch(bds.get_url(), bds.get_json())
     if not resp.ok:
         print resp.text
         print ('Could not create vlans')
         exit(0)
-
+    
+    # Create interface objects
     int1 = NX.Interface('eth1/15')
     int2 = NX.Interface('eth1/16')
     

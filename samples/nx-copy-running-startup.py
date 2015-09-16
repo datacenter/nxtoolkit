@@ -17,12 +17,15 @@
 #    under the License.                                                        #
 #                                                                              #
 ################################################################################
-from nxtoolkit.nxtoolkit import Vrrp
 """
-Sample of displays the vrrp information
+Simple application that logs on to the Switch and copy the
+running config to startup config
 """
+
 import sys
 import nxtoolkit.nxtoolkit as NX
+import time
+
 
 def main():
     """
@@ -31,32 +34,42 @@ def main():
     :return: None
     """
     # Take login credentials from the command line if provided
-    # Otherwise, take them from your environment variables file ~/.profile    
-    description = 'Simple application that logs on to the Switch and\
-                    displays vrrp information'
+    # Otherwise, take them from your environment variables file ~/.profile
+    description = 'copy running config to startup config'
     creds = NX.Credentials('switch', description)
     args = creds.get()
-    
+
     # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
-    
     resp = session.login()
     if not resp.ok:
         print('%% Could not login to Switch')
         sys.exit(0)
-        
-    template = "{0:16} {1:16} {2:16} {3:16} {4:16}"
-    print(template.format("Interface", "VRRP ID", "priority", "Primary ip", 
-                              "secondary ip"))
-    print(template.format("------------", "------------", "------------",
-                              "------------", "------------"))
-    
-    # To get details of vrrp of all the interfaces 
-    for vrrp in NX.Vrrp.get(session):
-        for id in vrrp.vrrp_ids:
-            print(template.format(vrrp.interface, id.vrrp_id, id.get_priority(), 
-                                   id.get_primary(), id.get_secondary()))
+
+    copy = NX.Copy()
+    run_to_start = NX.RunningToStartUp()
+    copy.add(run_to_start)
+
+    resp = session.push_to_switch(copy.get_url(), copy.get_json())
+    if not resp.ok:
+        print resp.text
+        print('%% Could not push to the switch')
+        exit(0)
+
+    # Get the status of copy
+    time.sleep(5)  # Waiting 5 sec. till the copy process is complete
+    copy = NX.Copy.get(session)
+    print "Copy status: ", copy.run_to_start.status
+
+    # Uncomment below lines to delete the copy task
+    '''
+    resp = session.delete(run_to_start.get_url())
+    if not resp.ok:
+        print resp.text
+        print('%% Could not delete from the switch')
+        exit(0)
+    '''
 
 
 if __name__ == '__main__':
-    main() 
+    main()

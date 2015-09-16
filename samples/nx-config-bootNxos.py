@@ -17,12 +17,12 @@
 #    under the License.                                                        #
 #                                                                              #
 ################################################################################
-from nxtoolkit.nxtoolkit import Vrrp
 """
-Sample of displays the vrrp information
+Simple application that logs on to the Switch and set the boot variable
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
+
 
 def main():
     """
@@ -31,32 +31,45 @@ def main():
     :return: None
     """
     # Take login credentials from the command line if provided
-    # Otherwise, take them from your environment variables file ~/.profile    
-    description = 'Simple application that logs on to the Switch and\
-                    displays vrrp information'
+    # Otherwise, take them from your environment variables file ~/.profile
+    description = '''Simple application that logs on to the
+                    Switch and set the boot variable.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
-    
+
     # Login to Switch
     session = NX.Session(args.url, args.login, args.password)
-    
     resp = session.login()
     if not resp.ok:
         print('%% Could not login to Switch')
         sys.exit(0)
-        
-    template = "{0:16} {1:16} {2:16} {3:16} {4:16}"
-    print(template.format("Interface", "VRRP ID", "priority", "Primary ip", 
-                              "secondary ip"))
-    print(template.format("------------", "------------", "------------",
-                              "------------", "------------"))
     
-    # To get details of vrrp of all the interfaces 
-    for vrrp in NX.Vrrp.get(session):
-        for id in vrrp.vrrp_ids:
-            print(template.format(vrrp.interface, id.vrrp_id, id.get_priority(), 
-                                   id.get_primary(), id.get_secondary()))
-
+    # Create Boot instance
+    boot = NX.BootNxos('n9000-dk9.7.0.3.I2.0.551')
+    
+    # Push boot configuration to the switch
+    resp = session.push_to_switch(boot.get_url(), boot.get_json())
+    if not resp.ok:
+        print resp.text
+        print ('Could not set the boot variable')
+        exit(0)
+        
+    boot_nxos = boot.get(session)
+    print "Current Boot Variables:"
+    print "Sup1"
+    print "NXOS variable = ", boot_nxos.sup1
+    print "Boot Variables on next reload:"
+    print "Sup2"
+    print "NXOS variable = ", boot_nxos.sup2
+        
+    # Uncomment below lines to delete unset the boot variable 
+    '''
+    resp = session.delete(boot.get_url())
+    if not resp.ok:
+        print('%% Could not delete from Switch')
+        sys.exit(0)
+    '''
+    
 
 if __name__ == '__main__':
-    main() 
+    main()

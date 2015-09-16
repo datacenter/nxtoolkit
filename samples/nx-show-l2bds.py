@@ -19,7 +19,7 @@
 ################################################################################
 """
 Simple application that logs on to the Switch and displays all
-of the vlans.
+of the l2bd's.
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -34,7 +34,7 @@ def main():
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
     description = '''Simple application that logs on to the Switch
-                    and displays all of the vlans.'''
+                    and displays all of the l2bd's.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 

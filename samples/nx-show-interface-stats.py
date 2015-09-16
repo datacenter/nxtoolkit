@@ -18,8 +18,8 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and displays all
-of the Interfaces.
+Simple application that logs on to the Switch and displays stats for all of 
+the Interfaces.
 """
 from operator import attrgetter
 import sys

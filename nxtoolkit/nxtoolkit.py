@@ -160,13 +160,6 @@ class L3Inst(BaseNXObject):
         self.adminState = 'admin-up'
         self._children = []
 
-    def add_l2bd(self, l2bd_obj=None):
-
-        if not isinstance(l2bd_obj, L2BD):
-            raise TypeError('A L2BD object required')
-
-        self._children.append(l2bd_obj)
-
     @classmethod
     def _get_switch_classes(cls):
         """
@@ -554,6 +547,28 @@ class L2BD(BaseNXObject):
         data = sorted(data)
         table = Table(data, headers, title=title + 'Bridge Domains')
         return [table, ]
+
+
+class ConfigBDs(BaseNXObject):
+    """
+    This class is used to configure multiple bridges domains at a time
+    """
+    def __init__(self, name=None):
+        if not name:
+            name = ""
+        super(ConfigBDs, self).__init__(name=name)
+        self.obj_name = 'bdEntity'
+    
+    def add_l2bds(self, bd):
+        if not isinstance(bd, L2BD):
+            raise TypeError ('A L2BD instance required')
+        self._children.append(bd)
+
+    def get_url(self):
+        return  '/api/node/mo/sys.json'
+
+    def get_json(self):
+        return super(ConfigBDs, self).get_json(self.obj_name)
 
 
 class BGPPeerAF(BaseNXObject):
@@ -3270,7 +3285,6 @@ class LinkNeighbors(BaseNXObject):
 class HardwareInternal(object):
     """
     This class defines hardware internal details
-    
     """
     def __init__(self, parent):
         self._parent = parent
@@ -3320,7 +3334,9 @@ class HardwareInternal(object):
             
     
 class Hardware(BaseNXObject):
-
+    """
+    This class defines Hardware.
+    """
     def __init__(self, session=None):
         self.internal = HardwareInternal(self)
         self._session = session
@@ -3343,7 +3359,6 @@ class Hardware(BaseNXObject):
 class LogTimeStamp(object):
     """
     This class defines timestamp logging
-    
     """
     def __init__(self, session=None, parent=None, format='seconds'):
         self._session= session
@@ -3377,7 +3392,9 @@ class LogTimeStamp(object):
 
 
 class LogMonitor(object):
-    
+    """
+    This class defines Monitor logging
+    """
     def __init__(self, session=None, parent=None,
                  admin_st='enabled', severity='notifications'):
         
@@ -3721,7 +3738,9 @@ class BreakoutModule(BaseNXObject):
             
 
 class InterfaceBreakout(BaseNXObject):
-
+    """
+    This class defines Interface Breakout
+    """
     def __init__(self, session=None):
         super(InterfaceBreakout, self).__init__(name='')
         self._session = session
@@ -4306,7 +4325,9 @@ class IPV6NextHop(object):
 
 
 class IPV6Route(BaseNXObject):
-
+    """
+    This class defines Ipv6 Route
+    """
     def __init__(self, prefix, name=None, parent=None, session=None):
         
         if not IPV6.is_valid_ipv6_address(prefix.split('/')[0]):
@@ -4586,3 +4607,781 @@ class Feature(BaseNXObject):
                     ret_data.append(feature)
 
         return ret_data
+
+
+class DhcpRelay(object):
+    """
+    This defines the DHCPRelay 
+    """
+    
+    def __init__(self, interface=None, session=None, parent=None):
+        # DhcpRelay object
+        self.object = 'dhcpRelayIf'
+        self.interface = interface
+        
+        #DhcpRelayAddr object
+        self.child_object = 'dhcpRelayAddr'
+        self._session= session
+        self._parent = parent
+        self.relay_address = []
+        self.vrf_name = []
+    
+    def add_relay_address(self, relay, vrf='!unspecified'):
+        if not relay:
+            raise TypeError('relay ip address not specified')
+        self.relay_address.append(relay)
+        self.vrf_name.append(vrf)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.interface:
+            att['id'] = self.interface
+        return att
+        
+    def _get_child_attributes(self):
+        child = []       
+        for (address, vrf) in zip(self.relay_address, self.vrf_name):
+            att = {self.child_object: {"attributes": 
+                                            {'address': address,
+                                             'vrf': vrf}}}
+            child.append(att)
+        return child
+    
+    def get_json(self):
+        return {self.object : { "attributes" : self._get_attributes(), 
+                                "children" : self._get_child_attributes()}}
+        
+        
+class Dhcp(BaseNXObject):
+    """
+    This defines the DHCP 
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(Dhcp, self).__init__(name="dhcp")
+
+        # Base Dhcp object
+        self.object  = 'dhcpInst'
+        self.v4relay_st = None
+        self.v6relay_st = None
+        
+        self._session = session
+        self._parent = parent
+        self.dhcp_relays = []
+    
+    def set_v4relay_st(self, v4relay_st=None):    
+        self.v4relay_st = v4relay_st
+        
+    def get_v4relay_st(self):
+        return self.v4relay_st
+    
+    def set_v6relay_st(self, v6relay_st=None):    
+        self.v6relay_st = v6relay_st
+        
+    def get_v6relay_st(self):
+        return self.v6relay_st
+               
+    def _get_attributes(self):
+        att = {}
+        if self.v4relay_st:
+            att['v4RelayEnabled'] = self.v4relay_st
+        if self.v6relay_st:
+            att['v6RelayEnabled'] = self.v6relay_st
+        return att
+    
+    def add_relay(self, relay=None):
+        if isinstance(relay, DhcpRelay): 
+            self._children.append(relay)
+            self.dhcp_relays.append(relay)
+        
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(Dhcp, self).get_json(obj_class=self.object, 
+                                          attributes=self._get_attributes())
+                                          
+    def get_url(self):
+        """
+       :returns: url object
+        """
+        return '/api/node/mo/sys/dhcp/inst.json'
+    
+    @classmethod
+    def get(self, session=None, version=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return List containing DHCP object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        ret_data = []
+        object = 'dhcpInst'
+        
+        query_url = '/api/node/mo/sys/dhcp/inst.json?rsp-subtree=full'
+        resp = session.get(query_url).json()['imdata']
+        dhcp = Dhcp()
+        for ret in resp:
+            v4relay_st =ret[object]['attributes']['v4RelayEnabled'] 
+            dhcp.set_v4relay_st(v4relay_st)
+            v6relay_st = ret[object]['attributes']['v6RelayEnabled']
+            dhcp.set_v6relay_st(v6relay_st)
+            if ret[object].get('children'):
+                for child in ret[object]['children']:
+                    child_obj = child['dhcpRelayIf']
+                    interface = child_obj['attributes']['id']
+                    dhcp_relay = DhcpRelay(interface=interface)
+                    for g_child in child_obj['children']:
+                        if child_obj.get('children'):
+                            address = str(g_child['dhcpRelayAddr']
+                                                 ['attributes']['address'])
+                            vrf = str(g_child['dhcpRelayAddr']['attributes']
+                                             ['vrf'])
+                            if vrf == '!unspecified':
+                                vrf = ''
+                            dhcp_relay.add_relay_address(address, vrf)
+                    if not version:
+                        dhcp.add_relay(dhcp_relay)
+                    if version=='ip' and '.' in address:
+                        dhcp.add_relay(dhcp_relay)
+                    elif version=='ipv6' and ':' in address:
+                        dhcp.add_relay(dhcp_relay)           
+        ret_data.append(dhcp)        
+        return ret_data
+
+
+class BootNxos(BaseNXObject):
+    """
+    This class is used to set boot variable
+    """
+    def __init__(self, image, session=None, parent=None):
+        """
+        :param image: String boot image file name
+        :param session: Session object to communicate with switch
+        """
+        if not isinstance(image, str):
+            raise TypeError
+        super(BootNxos, self).__init__(name="")
+        # Base boot object
+        self.object  = 'bootBoot'
+        self._session = session
+        self._parent = parent
+       	# boot image object 
+        self.child_object = 'bootImage'
+        self.sup1 = image
+        self.sup2 = image
+        
+    def _get_children_attributes(self):
+        child = []
+        att = {}
+        if self.sup1:
+            att['sup1'] = 'bootflash:/' + self.sup1 + '.bin'
+            att['sup2'] = 'bootflash:/' + self.sup2 + '.bin'
+        child.append({self.child_object : { "attributes" : att}})
+        return child
+        
+    def set_sup2(self, sup2):
+        self.sup2 = sup2
+        
+    def get_sup2(self):
+        return self.sup2
+    
+    def get_json(self):
+        return super(BootNxos,
+                     self).get_json(obj_class=self.object, 
+                                    attributes={},
+                                    children=self._get_children_attributes())
+                                          
+    def get_url(self):
+        """ Return boot url """
+        return '/api/node/mo/sys/boot.json'  
+    
+    @classmethod
+    def get(self, session):
+        """
+        :param session: Session object to communicate with Switch
+        :return BootNxos object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        obj = 'bootBoot'
+        query_url = '/api/node/mo/sys/boot.json?rsp-subtree=full'
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            children = ret[obj]['children']
+            for child in children:
+                sup1 = str(child['bootImage']['attributes']['sup1'])
+                sup2 = str(child['bootImage']['attributes']['sup2'])
+                boot = BootNxos(sup1)
+                boot.set_sup2(sup2)
+        return boot        
+
+
+class RunningToStartUp(object):
+    """
+    This class defines coping running to startup config
+    """
+    def __init__(self, session=None, parent=None):
+        self.obj_name = 'topSystemCopyRSLTask'
+        self.admin_st = 'start'
+        self.frequency = 'one-shot'
+        self.status = None
+    
+    def _get_att(self):
+        att = {}
+        att['adminSt'] = self.admin_st
+        att['freq'] = self.frequency
+        return att
+    
+    def set_status(self, status):
+        self.status = status
+
+    def set_admin_st(self, adminst):
+        self.admin_st = adminst
+
+    def set_frequency(self, freq):
+        self.frequency = freq
+    
+    @classmethod
+    def _get_lsub(cls):
+        return 'lsubj-[sys]'
+
+    def get_url(self):
+        return ('/api/mo/sys/action/%s.json' % 
+                (RunningToStartUp._get_lsub()))
+
+    def get_json(self):
+        return {self.obj_name: {'attributes': self._get_att()}}
+
+
+class Copy(BaseNXObject):
+    """
+    This class defines copy command of Nexus switch
+    """
+    def __init__(self):
+        self.obj_name = 'actionLSubj'
+        super(Copy, self).__init__(name="")
+        self.run_to_start = None
+    
+    def get_url(self):
+        return '/api/mo/sys/action.json'
+
+    def add(self, command):
+        if isinstance(command, RunningToStartUp):
+            self._children.append(command)
+            self.run_to_start = command
+        else:
+            raise TypeError('Invalid command class')
+
+    def _get_attributes(self):
+        return {"dn": self._get_dn()}
+    
+    def _get_dn(self):
+        return 'sys/action/' + RunningToStartUp._get_lsub()
+
+    def get_json(self):
+        return super(Copy, self).get_json(self.obj_name,
+                                          attributes=self._get_attributes())
+
+    @classmethod
+    def get(cls, session):
+        """
+        Get information if copy command performed properly or not.
+
+        :session session: Session instance used to communicate with the switch
+        :return Copy instance
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        query_url = '/api/mo/sys/action.json?rsp-subtree=full'
+        
+        resp = session.get(query_url).json()['imdata']
+        
+        # status is initially it is unknown
+        descr = 'unknown'
+        copy = Copy()
+        for count in resp:
+            if count.get('actionLCont'):
+                act_children = count['actionLCont']['children']
+                for act_child in act_children:
+                    if act_child.get('actionLSubj'):
+                        children = act_child['actionLSubj']['children']
+                        for child in children:
+                            obj_name = 'topSystemCopyRSRslt'
+                            if child.get(obj_name):
+                                # Description contains copy status (Success)
+                                descr = str(child[obj_name]
+                                            ['attributes']['descr'])
+                                run = RunningToStartUp(session=session, parent=copy)
+                                run.set_status(descr)
+                                copy.add(run)
+
+        return copy
+        
+
+class DnsVrf(BaseNXObject):
+    """
+    This defines the Dns Vrf configuration
+    """
+    
+    def __init__(self, name, session=None, parent=None):
+        super(DnsVrf, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.name = name
+        self.object = 'dnsVrf'
+        self.profile = None
+        self.providers = []
+        self.domains = []
+        self.domain_exts = []
+        
+    def set_profile(self, profile):
+        self.profile = profile
+        
+    def use_in(self, obj=None):
+        self._children.append(obj)
+        if isinstance(obj, DnsProvider):
+            self.providers.append(obj)
+        elif isinstance(obj, DnsDom):
+            self.domains.append(obj)
+        elif isinstance(obj, DnsDomExt):
+            self.domain_exts.append(obj)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.name:
+            att['name'] = self.name
+        return att
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DnsVrf, self).get_json(obj_class=self.object, 
+                                            attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Dns VRF url """
+        if not self.profile:
+            return '/api/node/mo/sys/dns/prof-default.json'
+        else:
+            return '/api/node/mo/sys/dns/prof-%s.json'% self.profile
+
+
+class DnsProvider(BaseNXObject):
+    """
+    This defines the Dns Provider configuration
+    """
+    
+    def __init__(self, address, session=None, parent=None):
+        super(DnsProvider, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.address = address
+        self.object = 'dnsProvider'
+        
+    def _get_attributes(self):
+        att = {}
+        if self.address:
+            att['addr'] = self.address
+        return att
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DnsProvider, self).get_json(obj_class=self.object, 
+                                            attributes=self._get_attributes())
+        
+        
+class DnsDom(BaseNXObject):
+    """
+    This defines the Dns Domain name configuration
+    """
+    
+    def __init__(self, name, session=None, parent=None):
+        super(DnsDom, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.name = name
+        self.object = 'dnsDom'
+        
+    def _get_attributes(self):
+        att = {}
+        if self.name:
+            att['name'] = self.name
+        return att
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DnsDom, self).get_json(obj_class=self.object, 
+                                            attributes=self._get_attributes()) 
+        
+        
+class DnsDomExt(BaseNXObject):
+    """
+    This defines the Dns domain list name configuration
+    """
+    
+    def __init__(self, name, session=None, parent=None):
+        super(DnsDomExt, self).__init__(name="")
+        self.name = name
+        self.object = 'dnsDomExt'
+        
+    def _get_attributes(self):
+        att = {}
+        if self.name:
+            att['name'] = self.name
+        return att
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DnsDomExt, self).get_json(obj_class=self.object, 
+                                            attributes=self._get_attributes())
+        
+        
+class DnsHost(BaseNXObject):
+    """
+    This defines the Dns host configuration
+    """
+    
+    def __init__(self, name, address, session=None, parent=None):
+        super(DnsHost, self).__init__(name=name)
+        self._session= session
+        self._parent = parent
+        self.name = name
+        self.address = address
+        self.object = 'dnsHost'
+        self.child_v4 = 'dnsIpv4Host'
+        self.child_v6 = 'dnsIpv6Host'
+        
+    def _get_attributes(self):
+        att = {}
+        if self.name:
+            att['name'] = self.name
+        return att
+    
+    def _get_children_attributes(self):
+        child = []
+        if self.address:
+            att = {'addr': self.address}
+        if '.' in self.address:
+            child.append({self.child_v4 : { "attributes" : att}})
+        if ':' in self.address:
+            child.append({self.child_v6 : { "attributes" : att}})
+        return child
+        
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DnsHost, self).get_json(obj_class=self.object, 
+                                    attributes=self._get_attributes(),
+                                    children=self._get_children_attributes())
+        
+
+class DnsProfile(BaseNXObject):
+    """
+    This defines the Dns profile configuration
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(DnsProfile, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.object = "dnsProf"
+        self.name = "default"
+        self.providers = []
+        self.domains = []
+        self.domain_exts = []
+        self.hosts = []
+        self.vrfs = []
+        
+    def set_prof_name(self, name):
+        self.name = name
+        
+    def get_prof_name(self):
+        return self.name
+        
+    def add(self, dns_obj=None):
+        self._children.append(dns_obj)
+        if isinstance(dns_obj, DnsProvider):
+            self.providers.append(dns_obj)
+        elif isinstance(dns_obj, DnsDom):
+            self.domains.append(dns_obj)
+        elif isinstance(dns_obj, DnsDomExt):
+            self.domain_exts.append(dns_obj)
+        elif isinstance(dns_obj, DnsHost):
+            self.hosts.append(dns_obj)
+        elif isinstance(dns_obj, DnsVrf):
+            self.vrfs.append(dns_obj)
+                
+    def _get_attributes(self):
+        att = {}
+        if self.name:
+            att['name'] = self.name
+        return att
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DnsProfile, self).get_json(obj_class=self.object,
+                                        attributes=self._get_attributes())
+
+  
+class DNS(BaseNXObject):
+    """
+    This defines the Dns Base Class
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(DNS, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.admin_st = None
+        self.object = "dnsEntity"
+        self.profiles = []
+    
+    def set_admin_st(self, admin_st):
+        self.admin_st = admin_st
+    
+    def get_admin_st(self):
+        return self.admin_st
+    
+    def enable_lookup(self):
+        self.admin_st = "enabled"
+        
+    def disable(self, feature):
+        self.admin_st = "disabled"
+        
+    def add_profile(self, dns_obj=None):
+        self._children.append(dns_obj)
+        self.profiles.append(dns_obj)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        return att
+        
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(DNS, self).get_json(obj_class=self.object, 
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Dns url """
+        return '/api/node/mo/sys/dns.json'
+    
+    
+    @classmethod
+    def _get_provider(cls, data, profile=None, vrf=None):
+        """ Returns the object by attaching provider object """
+        address = str(data['dnsProvider']['attributes']['addr'])
+        provider = DnsProvider(address)
+        if profile:
+            profile.add(provider)
+            return profile
+        if vrf:
+            vrf.use_in(provider)
+            return vrf
+    
+    @classmethod
+    def _get_domain_ext(cls, data, profile=None, vrf=None):
+        """ Returns the object by attaching DNS domain_ext object """
+        name = str(data['dnsDomExt']['attributes']['name'])
+        dom_ext = DnsDomExt(name)
+        if profile:
+            profile.add(dom_ext)
+            return profile
+        if vrf:
+            vrf.use_in(dom_ext)
+            return vrf
+        
+    @classmethod
+    def _get_domain(cls, data, profile=None, vrf=None):
+        """ Returns the object by attaching DNS domain object """
+        name = str(data['dnsDom']['attributes']['name'])
+        dom = DnsDom(name)
+        if profile:
+            profile.add(dom)
+            return profile
+        if vrf:
+            vrf.use_in(dom)
+            return vrf
+    
+    @classmethod
+    def get(cls, session):
+        """
+        :param session: Session object to communicate with Switch
+        :return Dns object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        obj = 'dnsEntity'
+        query_url = '/api/node/mo/sys/dns.json?rsp-subtree=full'
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            dns= DNS()
+            
+            admin_st = ret[obj]['attributes']['adminSt']
+            dns.set_admin_st(admin_st)
+            if ret[obj].get('children'):
+                for child in ret[obj]['children']:
+                    prof_name = str(child['dnsProf']['attributes']['name'])
+                    dns_profile = DnsProfile()
+                    dns_profile.set_prof_name(prof_name)
+                    if child['dnsProf'].get('children'):
+                        provider = child['dnsProf']['children']
+                        for data in provider:
+                            if data.get('dnsProvider'):
+                                dns_profile = cls._get_provider(data, 
+                                                    profile=dns_profile)
+                            elif data.get('dnsDomExt'):
+                                dns_profile = cls._get_domain_ext(data, 
+                                                    profile=dns_profile)
+                            elif data.get('dnsDom'):
+                                dns_profile =cls._get_domain(data, 
+                                                    profile=dns_profile)
+                            elif data.get('dnsHost'):
+                                host_name = str(data['dnsHost']['attributes']
+                                                ['name'])
+                                for version in data['dnsHost']['children']:
+                                    if version.get('dnsIpv4Host'):
+                                        ipv4 = str(version['dnsIpv4Host']
+                                                   ['attributes']['addr'])
+                                        host = DnsHost(host_name, ipv4)
+                                    elif version.get('dnsIpv6Host'):
+                                        ipv6 = str(version['dnsIpv6Host']
+                                                   ['attributes']['addr'])
+                                        host = DnsHost(host_name, ipv6)
+                                dns_profile.add(host)
+                            elif data.get('dnsVrf'):
+                                vrf_name = str(data['dnsVrf']['attributes']
+                                               ['name'])
+                                vrf = DnsVrf(vrf_name)
+                                for obj in data['dnsVrf']['children']:
+                                    if obj.get('dnsProvider'): 
+                                        vrf = cls._get_provider(obj, vrf=vrf)
+                                    elif obj.get('dnsDomExt'):
+                                        vrf = cls._get_domain_ext(obj, 
+                                                                  vrf=vrf)
+                                    elif obj.get('dnsDom'):
+                                        vrf = cls._get_domain(obj, vrf=vrf)
+                                dns_profile.add(vrf)
+
+                    dns.add_profile(dns_profile)
+        return dns
+    
+
+class ICMP(BaseNXObject):
+    """
+    This defines the Icmp configuration
+    """
+    
+    def __init__(self, version, interface, ctrl=None, session=None, 
+                 parent=None):
+        super(ICMP, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        if version == 'v4':
+            self.version = 'icmpv4If'
+        elif version == 'v6':
+            self.version = 'icmpv6If'
+        else:
+            raise TypeError('provide proper version')
+        
+        self.interface = interface
+        if ctrl:
+            self.ctrl = ctrl
+        else:
+            self.ctrl = ''
+        self.status = None
+        self.id = None
+        
+    def _get_attributes(self):
+        att = {}
+        if self.ctrl in ['', 'redirect']:
+            att['ctrl'] = self.ctrl
+        return att 
+    
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(ICMP, self).get_json(obj_class=self.version, 
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Icmp url """
+        if self.version == 'icmpv4If':
+            return ('/api/node/mo/sys/icmpv4/inst/dom-default/if-[%s].json'% 
+                    self.interface.if_name)
+        elif self.version == 'icmpv6If':
+            return ('/api/node/mo/sys/icmpv6/inst/if-[%s].json'% 
+                    self.interface.if_name)
+            
+    def _set_status(self, status):
+        self.status = status
+    
+    def _set_id(self, id):
+        self.id = id
+    
+    @classmethod
+    def _get(cls, session, query_url, version, icmps):
+        
+        resp = session.get(query_url).json()['imdata']
+        if version == 'v4':
+            cls.version = 'icmpv4If'
+        elif version == 'v6':
+            cls.version = 'icmpv6If'
+            
+        for ret in resp:
+            id = str(ret[cls.version]['attributes']['id'])
+            icmp = ICMP(version, id)
+            icmp._set_id(id)
+            if str(ret[cls.version]['attributes']['ctrl']) == 'redirect':
+                icmp._set_status('enabled')
+            else:
+                icmp._set_status('disabled') 
+            icmp.version = cls.version[:6]
+            icmps.append(icmp)
+        
+    @classmethod       
+    def get(cls, session, version=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return list of list of icmp objects
+        Example: [[icmp1(v4), icmp2(v4), ..], [icmp3(v6)]]
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required')
+        
+        icmps = []
+        if version == 'v4':
+            query_url = '/api/node/class/icmpv4If.json'
+            cls._get(session, query_url, version, icmps)
+            
+        elif version == 'v6':
+            query_url = '/api/node/class/icmpv6If.json'
+            cls._get(session, query_url, version, icmps)
+        
+        elif version == None:
+            query_url1 = '/api/node/class/icmpv4If.json'
+            cls._get(session, query_url1, 'v4', icmps)
+            query_url2 = '/api/node/class/icmpv6If.json'
+            cls._get(session, query_url2, 'v6', icmps)
+            
+        return icmps
+

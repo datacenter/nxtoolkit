@@ -17,9 +17,8 @@
 #    under the License.                                                        #
 #                                                                              #
 ################################################################################
-from nxtoolkit.nxtoolkit import Vrrp
 """
-Sample of displays the vrrp information
+Simple application to login into the switch and configure icmp 
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -32,8 +31,8 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile    
-    description = 'Simple application that logs on to the Switch and\
-                    displays vrrp information'
+    description = '''Simple application to login into the switch and configure
+                    icmp.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
     
@@ -44,19 +43,46 @@ def main():
     if not resp.ok:
         print('%% Could not login to Switch')
         sys.exit(0)
-        
-    template = "{0:16} {1:16} {2:16} {3:16} {4:16}"
-    print(template.format("Interface", "VRRP ID", "priority", "Primary ip", 
-                              "secondary ip"))
-    print(template.format("------------", "------------", "------------",
-                              "------------", "------------"))
     
-    # To get details of vrrp of all the interfaces 
-    for vrrp in NX.Vrrp.get(session):
-        for id in vrrp.vrrp_ids:
-            print(template.format(vrrp.interface, id.vrrp_id, id.get_priority(), 
-                                   id.get_primary(), id.get_secondary()))
+    # Create an instance of interface
+    int1 = NX.Interface('eth1/20')
+    int1.set_layer('Layer3')
+    
+    # Push the configuration to the switch to make the interface L3
+    resp = session.push_to_switch(int1.get_url(), int1.get_json())
+    if not resp.ok:
+        print ('%% Could not push to Switch')
+        print resp.text
+        sys.exit(0)
+    
+    # Create an instance of icmp
+    icmp = NX.ICMP('v4', int1, 'redirect')
+    
+    resp = session.push_to_switch(icmp.get_url(), icmp.get_json())
+    if not resp.ok:
+        print ('%% Could not push to Switch')
+        print resp.text
+        sys.exit(0)
+
+    # Uncomment below lines to delete Icmp from the given interface
+    '''
+    resp = session.delete(icmp.get_url())
+    if not resp.ok:
+        print ('%% Could not delete from Switch')
+        print resp.text
+        sys.exit(0)
+    '''
+        
+    # To get the redirection state
+    icmps = NX.ICMP.get(session)
+    
+    template = "{0:16} {1:16} {2:16}"
+    print template.format("Interface/Vlan", "Redirect state", "Version")
+    print template.format("---------------", "---------------", "---------------")
+    for icmp in icmps:
+        print template.format(icmp.id, icmp.status, icmp.version) 
+        
 
 
 if __name__ == '__main__':
-    main() 
+    main()

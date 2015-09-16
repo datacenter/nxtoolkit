@@ -58,6 +58,7 @@ def main():
 
     resp = session.push_to_switch(brkout.get_url(), brkout.get_json())
     if not resp.ok:
+        print resp.text
         print('%% Could not configure the Switch')
         sys.exit(0)
 

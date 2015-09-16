@@ -55,9 +55,6 @@ def main():
     config.add_svis(svi1)
     config.add_svis(svi2)
     
-    print config.get_url()
-    print config.get_json()
-    
     # Push entire configuration to the switch
     # Note: Using svi1.get_url() and svi1.get_json() only one svi
     # configuration can be pushed to the switch

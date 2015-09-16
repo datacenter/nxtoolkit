@@ -66,13 +66,12 @@ def main():
     config.add_port_channel(pc1)
     config.add_port_channel(pc2)
     
-    print config.get_json()
-    
     # Push/ create the port channel object to the switch
     # Note: To configure only single port channel use pc1.get_url() and 
     # pc1.get_json() instead of config.get_url() and config.get_json()
     resp = session.push_to_switch(config.get_url(), config.get_json())
     if not resp.ok:
+        print resp.text
         print('%% Could not push to Switch: %s' % (resp.text))
         sys.exit(0)
     
