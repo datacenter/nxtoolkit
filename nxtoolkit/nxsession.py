@@ -295,6 +295,9 @@ class Session(object):
         Indicates whether SSL certificates must be verified.  Possible\
         values are True and False with the default being False.
         """
+        # removing trailing slash from URL if present
+        if url.endswith('/'):
+            url = url[:-1]
         if 'https://' in url:
             self.ipaddr = url[len('https://'):]
         else:
