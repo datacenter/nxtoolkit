@@ -24,10 +24,17 @@ from nxtoolkit.nxtoolkit import (
     BGPSession, PortChannel, LinkNeighbors, Hardware, HardwareInternal,
     Logging, LogTimeStamp, LogConsole, LogMonitor, LogSourceInterface,
     LogLevel, LogServer, L2BD, L3Inst, InterfaceBreakout, BreakoutModule,
-    SVI, ConfigInterfaces, ConfigVrrps, Vrrp, VrrpID, Lacp, IPV6, IPV6Route,
+    SVI, ConfigInterfaces, ConfigVrrps, Vrrp, VrrpID, Lacp, IP, IPRoute,
     Feature, FeatureAttributes, Dhcp, DhcpRelay, BootNxos, Copy, 
     RunningToStartUp, DNS, DnsProfile, DnsHost, DnsDomExt, DnsDom, 
-    DnsProvider, DnsVrf, ICMP, ConfigBDs)
+    DnsProvider, DnsVrf, ICMP, ConfigBDs, UDLD, STP, StpInterface, StpVlan,
+    StpMst, ARP, AaaRole, AaaUserRole, AaaUser, AaaRadiusProvider, AaaRadius,
+    AaaTacacsProvider, AaaProviderRef, AaaTacacsProviderGroup, AaaTacacs, 
+    AaaAaa, RBAC, NdPrefix, NdInterface, ND, MatchRtType, MatchRtTag, 
+    SetPeerAddr, SetNextHop, SetLocalPref, SetOrigin, SetCommList, RtmapRs, 
+    RtmapMatch, RegCom, SetRegCom, RouteMapEntry, RouteMap, RtPrefix, 
+    PrefixList, AccessList, AsPath, CommunityItem, CommunityEntry, 
+    CommunityList, RPM)
 
 from nxtoolkit.nxphysobject import (Interface)
 import unittest
@@ -475,7 +482,7 @@ class TestIPV6(unittest.TestCase):
         int1 = Interface('eth1/1')
         int2 = Interface('eth1/2')
         pc1 = PortChannel('211')
-        ipv6 = IPV6()
+        ipv6 = IP('v6')
         ipv6.add_interface_address(int1, '2004:0DB8::1/10', link_local='FE83::1')
         ipv6.add_interface_address(int2, '2104:0DB8::1/11')
         ipv6.add_interface_address(int2, '2002:0DB8::1/12')
@@ -506,7 +513,7 @@ class TestIPV6(unittest.TestCase):
         """
         Test delete url of ipv6
         """
-        ipv6 = IPV6()
+        ipv6 = IP('v6')
         resp = ipv6.get_delete_url('eth1/1')
         expected_resp = '/api/node/mo/sys/ipv6/inst/dom-default/if-[eth1/1].json'
         self.assertEqual(str(resp), expected_resp)
@@ -525,7 +532,7 @@ class TestIPV6Route(unittest.TestCase):
         int2 = Interface('eth1/2')
         # Create a L3 port channel
         pc1 = PortChannel('211', layer='Layer3')
-        route = IPV6Route('2000:0::0/12')
+        route = IPRoute('2000:0::0/12', 'v6')
         route.add_next_hop('234E:44::1', int1, vrf='default', track_id='0',
                            tag='1')
         route.add_next_hop('234E:44::2', int2)
@@ -548,6 +555,101 @@ class TestIPV6Route(unittest.TestCase):
                          "pv6Nexthop': {'attributes': {'nhAddr': '234E:44::"
                          "4', 'object': '1', 'tag': '2', 'nhVrf': 'default'"
                          ", 'nhIf': 'po211'}}}]}}")
+        self.assertEqual(str(resp), expected_json)
+
+
+class TestIP(unittest.TestCase):
+    """
+    Test the IPV6 class offline
+    """
+    def create_ip(self):
+        """
+        Create two interface object and a port channel then configure 
+        ipv in those interfaces and port channel
+        """
+        int1 = Interface('eth1/1')
+        int2 = Interface('eth1/2')
+        pc1 = PortChannel('211')
+        
+        # Create IPv4 instance
+        ip = IP()
+        
+        # enable ip directed broadcast on the interface
+        ip.enable_directed_broadcast(int1)
+        
+        # Add interfaces
+        ip.add_interface_address(int1, '172.11.2.1/20')
+        ip.add_interface_address(int2, '171.11.3.1/21')
+    
+        # Add port channel
+        ip.add_interface_address(pc1, '172.11.4.4/13')
+
+        return ip  
+    
+    def test_config_ip(self):
+        """
+        Test configuring ip
+        """
+        ip = self.create_ip()
+        resp = ip.get_json()
+        expected_resp = ("{'ipv4Dom': {'attributes': {'name': 'default'}, "
+                         "'children': [{'ipv4If': {'attributes': {'id': 'e"
+                         "th1/1'}, 'children': [{'ipv4Addr': {'attributes'"
+                         ": {'addr': '172.11.2.1/20'}}}]}}, {'ipv4If': {'a"
+                         "ttributes': {'id': 'eth1/2'}, 'children': [{'ipv"
+                         "4Addr': {'attributes': {'addr': '171.11.3.1/21'}"
+                         "}}]}}, {'ipv4If': {'attributes': {'id': 'po211'}"
+                         ", 'children': [{'ipv4Addr': {'attributes': {'add"
+                         "r': '172.11.4.4/13'}}}]}}]}}")
+        self.assertEqual(str(resp), expected_resp)  
+    
+    def test_get_delete_url(self):
+        """
+        Test delete url of ip
+        """
+        ip = IP()
+        resp = ip.get_delete_url('eth1/1')
+        expected_resp = '/api/node/mo/sys/ipv4/inst/dom-default/if-[eth1/1].json'
+        self.assertEqual(str(resp), expected_resp)
+
+
+class TestIPRoute(unittest.TestCase):
+    """
+    This class defines the IPV6Route testing offline
+    """
+    def create_ip_route(self):
+        """
+        Create IPv6 route configure in the interfaces and port channel
+        """
+        # Create Interfaces
+        int1 = Interface('eth1/20')
+        int2 = Interface('eth1/21')
+        # Create a L3 port channel
+        pc1 = PortChannel('211', layer='Layer3')
+
+        # Configure IPv4 route and Nexthop information
+        r1 = IPRoute('1.1.1.1/32')
+        r1.add_next_hop('2.2.2.2', int1, vrf='default', track_id='0', tag='1')
+        r1.add_next_hop('3.3.3.3', int2)
+        r1.add_next_hop('4.4.4.4', pc1, vrf='default', track_id='1', tag='2')
+        
+        return r1
+    
+    def test_ip_route(self):
+        """
+        Test configuring IPV6Route
+        """
+        route = self.create_ip_route()
+        resp = route.get_json()
+        expected_json = ("{'ipv4Route': {'attributes': {'prefix': '1.1.1.1/32"
+                         "'}, 'children': [{'ipv4Nexthop': {'attributes': {'n"
+                         "hAddr': '2.2.2.2', 'object': '0', 'tag': '1', 'nhVr"
+                         "f': 'default', 'nhIf': 'eth1/20'}}}, {'ipv4Nexthop'"
+                         ": {'attributes': {'nhAddr': '3.3.3.3', 'nhVrf': 'de"
+                         "fault', 'nhIf': 'eth1/21'}}}, {'ipv4Nexthop': {'att"
+                         "ributes': {'nhAddr': '4.4.4.4', 'object': '1', 'tag"
+                         "': '2', 'nhVrf': 'default', 'nhIf': 'po211'}}}]}}")
+
         self.assertEqual(str(resp), expected_json)
 
 
@@ -807,6 +909,349 @@ class TestIcmp(unittest.TestCase):
         self.assertEqual(str(resp), expected_resp)        
 
 
+class TestSTP(unittest.TestCase):
+    """
+    Test the STP class offline
+    """       
+    def create_stp(self):
+        """
+        Create a Stp and configure it
+        """
+        stp = STP()
+        stp.set_mode('pvrst')
+    
+        stp.add_port_type('bpdufilter')
+        stp.add_port_type('bpduguard')
+        stp.add_port_type('edge')
+        stp.add_port_type('network')
+    
+        mst_etity = StpMst()
+        mst_etity.set_simulate('disabled')
+    
+        vlan = StpVlan('222')
+        vlan.set_admin_st('enabled')
+        vlan.set_bdg_priority('12288')
+    
+        int = Interface('eth1/1')
+        i_face = StpInterface(int)
+        # Mode can be set to network/edge/normal only for l2 interface
+        i_face.set_mode('network')
+    
+        stp.add(mst_etity)
+        stp.add(vlan)
+        stp.add(i_face)
+        return stp
+    
+    def test_create_stp(self):
+        """
+        Test creating stp
+        """
+        stp = self.create_stp()
+        resp = stp.get_json()
+        expected_resp = ("{'stpInst': {'attributes': {'mode': 'pvrst', 'ctrl'"
+                         ": 'normal,extchp-bpdu-filter,extchp-bpdu-guard,netw"
+                         "ork'}, 'children': [{'stpMstEntity': {'attributes':"
+                         " {'simulate': 'disabled'}, 'children': []}}, {'stpV"
+                         "lan': {'attributes': {'bridgePriority': '12510', 'i"
+                         "d': '222', 'adminSt': 'enabled'}, 'children': []}},"
+                         " {'stpIf': {'attributes': {'id': 'eth1/1', 'mode': "
+                         "'network'}, 'children': []}}]}}")
+        self.assertEqual(str(resp), expected_resp)
+
+
+class TestUdld(unittest.TestCase):
+    """
+    Test the udld class offline
+    """       
+    def create_udld(self):
+        """
+        Create a Udld and configure it
+        """
+        udld = UDLD()
+        int = Interface('eth1/2')
+    
+        udld.enable_aggress()
+        udld.disable_aggress(int)
+        return udld
+    
+    def test_create_udld(self):
+        """
+        Test creating udld
+        """
+        udld = self.create_udld()
+        resp = udld.get_json()
+        expected_resp = ("{'udldInst': {'attributes': {'aggressive': 'enabled"
+                         "'}, 'children': [{'udldPhysIf': {'attributes': {'ag"
+                         "gressive': 'disabled', 'id': 'eth1/2'}}}]}}")
+        self.assertEqual(str(resp), expected_resp)
+        
+        
+class TestArp(unittest.TestCase):
+    """
+    Test the arp class offline
+    """
+    def create_arp(self):
+        """
+        Create arp and configure it
+        """
+        arp = ARP() 
+        arp.set_timeout('100')
+        return arp
+    
+    def test_create_arp(self):
+        """
+        Test creating arp
+        """
+        arp = self.create_arp()
+        resp = arp.get_json()
+        expected_resp = ("{'arpInst': {'attributes': {'timeout': '100'}, 'chi"
+                         "ldren': []}}")
+        self.assertEqual(str(resp), expected_resp)        
+
+
+class TestRBAC(unittest.TestCase):
+    """
+    Test the Route Based Access Control class offline
+    """
+    def create_rbac(self):
+        """
+        create rbac and configure it
+        """
+        rbac = RBAC()
+        rbac.create_role('test-role')
+        rbac.enable_pwd_strength_check()
+        rbac.enable_pwd_secure_mode()
+        rbac.set_pwd_max_length('127')
+        rbac.set_pwd_min_length('4')
+        
+        user = AaaUser(name='test1', password='Test1',role='network-admin',
+                      ssh_key='ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDczcGut'
+                      'F5w331l0bNAeDSqKmwzLYYjElGIEogIE04rE0kX+CaWP/nDVEwETT'
+                      'sKlp5w4gi0mA9/4kpk7gDGRCmAiNT8MWaTYt4ewGj+dZ+fbpUUf5t'
+                      'v1DwLvxcQOoQ3qvxazOQWOLxwSW7zrJBpSokEtDNyY6BlsXP33q2h'
+                      'gOBeAw==')
+        
+        rad_server = AaaRadius()
+        rad_server.set_retries('4')
+        rad_server.set_timeout('30')
+        rad_server.set_src_interface('lo0')
+        rad_server.set_key(key='cisco', key_enc='7')
+        rad_server.add_host('1.2.3.4', key='cisco', key_enc='7', 
+                            timeout='5',retries='3')
+        
+        tacacs = AaaTacacs()
+        tacacs.set_deadtime('10')
+        tacacs.set_timeout('20')
+        tacacs.set_src_interface('mgmt 0')
+        tacacs.set_key(key='cisco', key_enc='7')
+        tacacs.add_host('1.2.3.3', key='cisco', key_enc='7', port='50', 
+                        timeout='30')
+        tacacs.add_group('tac1', vrf='management', deadtime='10', 
+                         server='1.2.3.3')
+        
+        aaa = AaaAaa()
+        aaa.disable_auth_login('error-enable')
+        aaa.enable_auth_login('ascii-authentication')
+        aaa.set_auth_default_grp('tac1') #pass default group name
+        aaa.set_author_default_grp() #pass default group name and cmd type(cmd type will be exec by default)
+        aaa.set_acc_default_grp('tac1') #pass default group name
+        
+        rbac.add(user)
+        rbac.add(rad_server)
+        rbac.add(tacacs)
+        rbac.add(aaa)
+        return rbac
+    
+    def test_create_rbac(self):
+        """ Test creating rbac """
+        rbac = self.create_rbac()
+        resp = rbac.get_json()
+        expected_resp = ("{'aaaUserEp': {'attributes': {'pwdStrengthCheck': '"
+                         "yes', 'pwdMinLength': '4', 'pwdMaxLength': '127', '"
+                         "pwdSecureMode': 'yes'}, 'children': [{'aaaRole': {'"
+                         "attributes': {'name': 'test-role'}, 'children': []}"
+                         "}, {'aaaUser': {'attributes': {'pwd': 'Test1', 'nam"
+                         "e': 'test1', 'pwdSet': 'yes'}, 'children': [{'aaaSs"
+                         "hAuth': {'attributes': {'data': 'ssh-rsa AAAAB3NzaC"
+                         "1yc2EAAAADAQABAAAAgQDczcGutF5w331l0bNAeDSqKmwzLYYjE"
+                         "lGIEogIE04rE0kX+CaWP/nDVEwETTsKlp5w4gi0mA9/4kpk7gDG"
+                         "RCmAiNT8MWaTYt4ewGj+dZ+fbpUUf5tv1DwLvxcQOoQ3qvxazOQ"
+                         "WOLxwSW7zrJBpSokEtDNyY6BlsXP33q2hgOBeAw=='}}}, {'aa"
+                         "aUserDomain': {'attributes': {'dn': 'sys/userext/us"
+                         "er-test1/userdomain-all', 'name': 'all'}, 'children"
+                         "': [{'aaaUserRole': {'attributes': {'name': 'networ"
+                         "k-admin'}}}]}}]}}, {'aaaRadiusEp': {'attributes': {"
+                         "'retries': '4', 'timeout': '30', 'keyEnc': '7', 'ke"
+                         "y': 'cisco', 'srcIf': 'lo0'}, 'children': [{'aaaRad"
+                         "iusProvider': {'attributes': {'retries': '3', 'time"
+                         "out': '5', 'name': '1.2.3.4', 'key': 'cisco', 'keyE"
+                         "nc': '7'}, 'children': []}}]}}, {'aaaTacacsPlusEp':"
+                         " {'attributes': {'timeout': '20', 'deadtime': '10',"
+                         " 'keyEnc': '7', 'key': 'cisco', 'srcIf': 'mgmt 0'},"
+                         " 'children': [{'aaaTacacsPlusProvider': {'attribute"
+                         "s': {'port': '50', 'timeout': '30', 'name': '1.2.3."
+                         "3', 'key': 'cisco', 'keyEnc': '7'}, 'children': []}"
+                         "}, {'aaaTacacsPlusProviderGroup': {'attributes': {'"
+                         "deadtime': '10', 'name': 'tac1', 'vrf': 'management"
+                         "'}, 'children': [{'aaaProviderRef': {'attributes': "
+                         "{'name': '1.2.3.3'}, 'children': []}}]}}]}}, {'aaaA"
+                         "uthRealm': {'attributes': {}, 'children': [{'aaaDef"
+                         "aultAuth': {'attributes': {'providerGroup': 'tac1',"
+                         " 'errEn': 'no', 'authProtocol': 'ascii'}}}, {'aaaDe"
+                         "faultAuthor': {'attributes': {'providerGroup': '', "
+                         "'cmdType': 'exec'}}}, {'aaaDefaultAcc': {'attribute"
+                         "s': {'providerGroup': 'tac1'}}}]}}]}}")
+        self.assertEqual(str(resp), expected_resp)
+        
+        
+class TestND(unittest.TestCase):
+    """
+    Test the Neighbor Discovery class offline
+    """
+    def create_nd(self):
+        """
+        create nd and configure it
+        """
+        nd = ND()
+        nd_int = NdInterface('vlan123')
+        nd_int.disable_redirect()
+        nd_int.set_ra_interval('600')
+        nd_int.set_prefix('2000::/12', '100', '99')
+        nd.add(nd_int)
+        return nd
+    
+    def test_create_nd(self):
+        """ Test creating neighbor discovery """
+        nd = self.create_nd()
+        resp = nd.get_json()
+        expected_resp = ("{'ndDom': {'attributes': {}, 'children': [{'ndIf': "
+                         "{'attributes': {'raIntvl': '600', 'id': 'vlan123', "
+                         "'ctrl': ''}, 'children': [{'ndPfx': {'attributes': "
+                         "{'lifetime': '100', 'addr': '2000::/12', 'prefLifet"
+                         "ime': '99'}, 'children': []}}]}}]}}")
+        self.assertEqual(str(resp), expected_resp)
+        
+        
+class TestRPM(unittest.TestCase):
+    """
+    Test the Route Processor Module class offline
+    """
+    def create_rpm(self):
+        """
+        create rpm and configure it
+        """
+        rpm = RPM()       
+        route_map = RouteMap('Test_route_map')     
+        map_entry = RouteMapEntry('permit', '10')
+        map_entry.set_descr('This is test route-map')
+        map_entry.match_rt_type('local')     
+        map_entry.match_rt_tag('200')        
+        map_entry.disable_nh_peer('v4')  
+        map_entry.set_next_hop('10.10.10.10') 
+        map_entry.set_next_hop('10:20::30:40')
+        map_entry.set_local_pref('1000')            
+        map_entry.set_origin('incomplete')            
+        map_entry.set_comm_list('test-community', 'delete')     
+        map_entry.match_as_path('test-access-list')
+        map_entry.match_pfxlistv4('test-prefix-v4')
+        map_entry.match_pfxlistv6('test-prefix-v6')
+        map_entry.match_comm('test-community', 'exact')
+        map_entry.set_comm('additive,internet,local-AS,no-advertise,no-export,1:2')
+    
+        route_map.add(map_entry)
+    
+        pfx_v4 = PrefixList('test_prefix')
+        pfx_v4.set_prefix(pfx_addr='1.2.3.4/8', action='permit', seq_no='10')
+    
+        pfx_v6 = PrefixList('test_prefix', 'v6')
+        pfx_v6.set_prefix(pfx_addr='ffff:1::2:3/8', action='permit', seq_no='10')
+    
+        as_path = AsPath('testAccList')
+        as_path.set_access_list('permit', '1234')
+    
+        comm = CommunityList('comrule', 'standard')
+        comm_entry = CommunityEntry('permit', 'internet,local-AS,no-advertise,no-export,1:2', '5')
+        comm.add(comm_entry)
+    
+        rpm.add(route_map)
+        rpm.add(pfx_v4)
+        rpm.add(pfx_v6)
+        rpm.add(as_path)
+        rpm.add(comm) 
+        
+        return rpm
+    
+    def test_create_rpm(self):
+        """ Test creating rpm """
+        rpm = self.create_rpm()
+        resp = rpm.get_json()
+        expected_resp = ("{'rpmEntity': {'attributes': {}, 'children': [{'rtm"
+                         "apRule': {'attributes': {'name': 'Test_route_map'},"
+                         " 'children': [{'rtmapEntry': {'attributes': {'actio"
+                         "n': 'permit', 'order': '10', 'descr': 'This is test"
+                         " route-map'}, 'children': [{'rtmapMatchRtType': {'a"
+                         "ttributes': {'routeT': 'local'}, 'children': []}}, "
+                         "{'rtmapMatchRtTag': {'attributes': {'tag': '200'}, "
+                         "'children': []}}, {'rtmapSetNhPeerAddr': {'attribut"
+                         "es': {'v4PeerAddr': 'disabled'}, 'children': []}}, "
+                         "{'rtmapSetNh': {'attributes': {'addr': '10.10.10.10"
+                         "'}, 'children': []}}, {'rtmapSetNh': {'attributes':"
+                         " {'addr': '10:20::30:40'}, 'children': []}}, {'rtma"
+                         "pSetPref': {'attributes': {'localPref': '1000'}, 'c"
+                         "hildren': []}}, {'rtmapSetOrigin': {'attributes': {"
+                         "'originT': 'incomplete'}, 'children': []}}, {'rtmap"
+                         "SetCommList': {'attributes': {'name': 'test-communi"
+                         "ty', 'delete': 'enabled'}, 'children': []}}, {'rtma"
+                         "pMatchAsPathAccessList': {'attributes': {}, 'childr"
+                         "en': [{'rtmapRsRtAsPathAccAtt': {'attributes': {'tD"
+                         "n': 'sys/rpm/accesslist-test-access-list'}, 'childr"
+                         "en': []}}]}}, {'rtmapMatchRtDst': {'attributes': {}"
+                         ", 'children': [{'rtmapRsRtDstAtt': {'attributes': {"
+                         "'tDn': 'sys/rpm/pfxlistv4-test-prefix-v4'}, 'childr"
+                         "en': []}}]}}, {'rtmapMatchRtDstV6': {'attributes': "
+                         "{}, 'children': [{'rtmapRsRtDstV6Att': {'attributes"
+                         "': {'tDn': 'sys/rpm/pfxlistv6-test-prefix-v6'}, 'ch"
+                         "ildren': []}}]}}, {'rtmapMatchRegComm': {'attribute"
+                         "s': {'criteria': 'exact'}, 'children': [{'rtmapRsRe"
+                         "gCommAtt': {'attributes': {'tDn': 'sys/rpm/rtregcom"
+                         "-test-community'}, 'children': []}}]}}, {'rtmapSetR"
+                         "egComm': {'attributes': {'additive': 'enabled'}, 'c"
+                         "hildren': [{'rtregcomItem': {'attributes': {'commun"
+                         "ity': 'regular:as2-nn2:0:0'}, 'children': []}}, {'r"
+                         "tregcomItem': {'attributes': {'community': 'regular"
+                         ":as2-nn2:65535:65283'}, 'children': []}}, {'rtregco"
+                         "mItem': {'attributes': {'community': 'regular:as2-n"
+                         "n2:65535:65282'}, 'children': []}}, {'rtregcomItem'"
+                         ": {'attributes': {'community': 'regular:as2-nn2:655"
+                         "35:65281'}, 'children': []}}, {'rtregcomItem': {'at"
+                         "tributes': {'community': 'regular:as2-nn2:1:2'}, 'c"
+                         "hildren': []}}]}}]}}]}}, {'rtpfxRuleV4': {'attribut"
+                         "es': {'name': 'test_prefix'}, 'children': [{'rtpfxE"
+                         "ntry': {'attributes': {'action': 'permit', 'pfx': '"
+                         "1.2.3.4/8', 'order': '10'}, 'children': []}}]}}, {'"
+                         "rtpfxRuleV6': {'attributes': {'name': 'test_prefix'"
+                         "}, 'children': [{'rtpfxEntry': {'attributes': {'act"
+                         "ion': 'permit', 'pfx': 'ffff:1::2:3/8', 'order': '1"
+                         "0'}, 'children': []}}]}}, {'rtlistRule': {'attribut"
+                         "es': {'name': 'testAccList'}, 'children': [{'rtlist"
+                         "Entry': {'attributes': {'action': 'permit', 'regex'"
+                         ": '1234', 'order': '1'}, 'children': []}}]}}, {'rtr"
+                         "egcomRule': {'attributes': {'name': 'comrule', 'mod"
+                         "e': 'standard'}, 'children': [{'rtregcomEntry': {'a"
+                         "ttributes': {'action': 'permit', 'order': '5'}, 'ch"
+                         "ildren': [{'rtregcomItem': {'attributes': {'communi"
+                         "ty': 'regular:as2-nn2:0:0'}, 'children': []}}, {'rt"
+                         "regcomItem': {'attributes': {'community': 'regular:"
+                         "as2-nn2:65535:65283'}, 'children': []}}, {'rtregcom"
+                         "Item': {'attributes': {'community': 'regular:as2-nn"
+                         "2:65535:65282'}, 'children': []}}, {'rtregcomItem':"
+                         " {'attributes': {'community': 'regular:as2-nn2:6553"
+                         "5:65281'}, 'children': []}}, {'rtregcomItem': {'att"
+                         "ributes': {'community': 'regular:as2-nn2:1:2'}, 'ch"
+                         "ildren': []}}]}}]}}]}}")
+        self.assertEqual(str(resp), expected_resp)
+        
+        
 class TestLiveSwitch(unittest.TestCase):
     """
     Test with a live Switch
@@ -983,9 +1428,18 @@ class TestLiveIPV6(TestLiveSwitch):
     """ This class defines live testing of ipv6 """
     def test_get_ipv6(self):
         session = self.login_to_switch()
-        self.assertRaises(TypeError, IPV6.get, None)
-        ipv6 = IPV6(session=session)
-        self.assertTrue(isinstance(ipv6, IPV6))
+        self.assertRaises(TypeError, IP.get, None)
+        ipv6 = IP(version='v6', session=session)
+        self.assertTrue(isinstance(ipv6, IP))
+
+
+class TestLiveIP(TestLiveSwitch):
+    """ This class defines live testing of ipv6 """
+    def test_get_ipv4(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, IP.get, None)
+        ipv6 = IP(session=session)
+        self.assertTrue(isinstance(ipv6, IP))
         
         
 class TestLiveFeature(TestLiveSwitch):
@@ -1104,7 +1558,367 @@ class TestLiveIcmp(TestLiveSwitch):
         self.assertRaises(TypeError, ICMP.get, None)
         icmp = ICMP('v4', 'eth2/1', session)
         self.assertTrue(isinstance(icmp, ICMP))                   
+
+
+class TestLiveUdld(TestLiveSwitch):
+    """ This class defines live testing of udld """
+    def test_get_udld(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, UDLD.get, None)
+        udld = UDLD(session=session)
+        self.assertTrue(isinstance(udld, UDLD))           
+    
+
+class TestLiveSTP(TestLiveSwitch):
+    """ This class defines live testing of stp """
+    def test_get_stp(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, STP.get, None)
+        stp = STP(session=session)
+        self.assertTrue(isinstance(stp, STP))  
+
+
+class TestLiveStpInterface(TestLiveSwitch):
+    """ This class defines live testing of stp interface """
+    def test_stp_interface(self):
+        session = self.login_to_switch()
+        stp_int = StpInterface('eth1/1', session=session)
+        self.assertTrue(isinstance(stp_int, StpInterface))    
         
+        
+class TestLiveStpVlan(TestLiveSwitch):
+    """ This class defines live testing of stp vlan """
+    def test_stp_vlan(self):
+        session = self.login_to_switch()
+        stp_vlan = StpVlan('1', session=session)
+        self.assertTrue(isinstance(stp_vlan, StpVlan))
+        
+        
+class TestLiveStpMst(TestLiveSwitch):
+    """ This class defines live testing of stp mst """
+    def test_stp_mst(self):
+        session = self.login_to_switch()
+        stp_mst = StpMst(session=session)
+        self.assertTrue(isinstance(stp_mst, StpMst))
+        
+        
+class TestLiveARP(TestLiveSwitch):
+    """ This class defines live testing of arp """
+    def test_get_arp(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, ARP.get, None)
+        arp = ARP(session=session)
+        self.assertTrue(isinstance(arp, ARP))
+        
+
+class TestLiveAaaRole(TestLiveSwitch):
+    """ This class defines live testing of aaarole """
+    def test_role(self):
+        session = self.login_to_switch()
+        role = AaaRole('test-role', session=session)
+        self.assertTrue(isinstance(role, AaaRole))
+        
+        
+class TestLiveAaaUserRole(TestLiveSwitch):
+    """ This class defines live testing of user role """
+    def test_user_role(self):
+        session = self.login_to_switch()
+        user_role = AaaUserRole('test1', 'network-admin', 
+                                session=session)
+        self.assertTrue(isinstance(user_role, AaaUserRole)) 
+        
+        
+class TestLiveAaaUser(TestLiveSwitch):
+    """ This class defines live testing of user """
+    def test_get_user(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, AaaUser.get, None)
+        user = AaaUser('test1', session=session)
+        self.assertTrue(isinstance(user, AaaUser)) 
+        
+
+class TestLiveAaaRadiusProvider(TestLiveSwitch):
+    """ This class defines live testing of radius provider """
+    def test_radius_provider(self):
+        session = self.login_to_switch()
+        rad_provider = AaaRadiusProvider('1.2.3.4', session=session)
+        self.assertTrue(isinstance(rad_provider, AaaRadiusProvider))
+        
+        
+class TestLiveAaaRadius(TestLiveSwitch):
+    """ This class defines live testing of radius-server """
+    def test_get_radius(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, AaaRadius.get, None)
+        radius = AaaRadius(session=session)
+        self.assertTrue(isinstance(radius, AaaRadius)) 
+        
+        
+class TestLiveAaaTacacsProvider(TestLiveSwitch):
+    """ This class defines live testing of tacacs provider """
+    def test_tacacs_provider(self):
+        session = self.login_to_switch()
+        tacacs_provider = AaaTacacsProvider('1.2.3.3', session=session)
+        self.assertTrue(isinstance(tacacs_provider, AaaTacacsProvider))                                
+    
+    
+class TestLiveAaaProviderRef(TestLiveSwitch):
+    """ This class defines live testing of provider ref """
+    def test_provider_ref(self):
+        session = self.login_to_switch()
+        provider_ref = AaaProviderRef(name='tac1', server='1.2.3.3', 
+                                      session=session)
+        self.assertTrue(isinstance(provider_ref, AaaProviderRef))
+        
+        
+class TestLiveAaaTacacsProviderGroup(TestLiveSwitch):
+    """ This class defines live testing of tacacs provider group """
+    def test_tacacs_provider_group(self):
+        session = self.login_to_switch()
+        tacacs_prov_grp = AaaTacacsProviderGroup('tac1', session=session)
+        self.assertTrue(isinstance(tacacs_prov_grp, AaaTacacsProviderGroup)) 
+        
+        
+class TestLiveAaaTacacs(TestLiveSwitch):
+    """ This class defines live testing of tacacs-server """
+    def test_get_tacacs(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, AaaTacacs.get, None)
+        tacacs = AaaTacacs(session=session)
+        self.assertTrue(isinstance(tacacs, AaaTacacs))                    
+    
+    
+class TestLiveAaaAaa(TestLiveSwitch):
+    """ This class defines live testing of aaa """
+    def test_get_aaa(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, AaaAaa.get, None)
+        aaa = AaaAaa(session=session)
+        self.assertTrue(isinstance(aaa, AaaAaa))    
+    
+    
+class TestLiveRBAC(TestLiveSwitch):
+    """ This class defines live testing of rbac """
+    def test_get_rbac(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, RBAC.get, None)
+        rbac = RBAC(session=session)
+        self.assertTrue(isinstance(rbac, RBAC))
+        
+        
+class TestLiveNdPrefix(TestLiveSwitch):
+    """ This class defines live testing of nd prefix """
+    def test_nd_pfx(self):
+        session = self.login_to_switch()
+        nd_pfx = NdPrefix('vlan123', '2000::/12', '100', '99', 
+                          session=session)
+        self.assertTrue(isinstance(nd_pfx, NdPrefix)) 
+        
+        
+class TestLiveNdInterface(TestLiveSwitch):
+    """ This class defines live testing of nd interface """
+    def test_get_nd_interface(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, NdInterface.get, None)
+        nd_int = NdInterface('vlan123', session=session)
+        self.assertTrue(isinstance(nd_int, NdInterface)) 
+        
+        
+class TestLiveND(TestLiveSwitch):
+    """ This class defines live testing of neighbor discovery """
+    def test_get_nd(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, ND.get, None)
+        nd = ND(session=session)
+        self.assertTrue(isinstance(nd, ND))                          
+    
+
+class TestLiveMatchRtType(TestLiveSwitch):
+    """ This class defines live testing of match route type"""
+    def test_match_rt_type(self):
+        session = self.login_to_switch()
+        rt_type = MatchRtType('Test_route_map', '10', 'local', 
+                              session=session)
+        self.assertTrue(isinstance(rt_type, MatchRtType))
+        
+
+class TestLiveMatchRtTag(TestLiveSwitch):
+    """ This class defines live testing of match route tag"""
+    def test_match_rt_tag(self):
+        session = self.login_to_switch()
+        rt_tag = MatchRtTag('Test_route_map', '10', '200', session=session)
+        self.assertTrue(isinstance(rt_tag, MatchRtTag)) 
+        
+        
+class TestLiveSetPeerAddr(TestLiveSwitch):
+    """ This class defines live testing of set peer addr"""
+    def test_set_peer_addr(self):
+        session = self.login_to_switch()
+        peer_addr = SetPeerAddr('Test_route_map', '10', session=session)
+        self.assertTrue(isinstance(peer_addr, SetPeerAddr))  
+        
+
+class TestLiveSetNextHop(TestLiveSwitch):
+    """ This class defines live testing of set next hop"""
+    def test_set_next_hop(self):
+        session = self.login_to_switch()
+        next_hop = SetNextHop('Test_route_map', '10', '10.10.10.10', 
+                              session=session)
+        self.assertTrue(isinstance(next_hop, SetNextHop))
+        
+        
+class TestLiveSetLocalPref(TestLiveSwitch):
+    """ This class defines live testing of set local pref"""
+    def test_set_local_pref(self):
+        session = self.login_to_switch()
+        local_pref = SetLocalPref('Test_route_map', '10', '1000', 
+                                  session=session)
+        self.assertTrue(isinstance(local_pref, SetLocalPref))
+
+
+class TestLiveSetOrigin(TestLiveSwitch):
+    """ This class defines live testing of set origin"""
+    def test_set_origin(self):
+        session = self.login_to_switch()
+        origin = SetOrigin('Test_route_map', '10', 'incomplete', 
+                           session=session)
+        self.assertTrue(isinstance(origin, SetOrigin))                     
+
+
+class TestLiveSetCommList(TestLiveSwitch):
+    """ This class defines live testing of set comm list"""
+    def test_set_comm_list(self):
+        session = self.login_to_switch()
+        comm_list = SetCommList('Test_route_map', '10', 'test-community', 
+                                'delete', session=session)
+        self.assertTrue(isinstance(comm_list, SetCommList))
+
+
+class TestLiveRtMapRs(TestLiveSwitch):
+    """ This class defines live testing of route maprs"""
+    def test_rt_maprs(self):
+        session = self.login_to_switch()
+        rt_maprs = RtmapRs('Test_route_map', '10', 'rtmapRsRtAsPathAccAtt',
+                           'test-access-list', session=session)
+        self.assertTrue(isinstance(rt_maprs, RtmapRs))
+
+
+class TestLiveRtMapMatch(TestLiveSwitch):
+    """ This class defines live testing of route mapmatch"""
+    def test_rt_mapmatch(self):
+        session = self.login_to_switch()
+        rt_mapmatch = RtmapMatch('Test_route_map', '10', 
+                                 'rtmapMatchAsPathAccessList', 
+                                 'test-access-list', session=session)
+        self.assertTrue(isinstance(rt_mapmatch, RtmapMatch))
+        
+
+class TestLiveRegCom(TestLiveSwitch):
+    """ This class defines live testing of reg com"""
+    def test_reg_com(self):
+        session = self.login_to_switch()
+        reg_com = RegCom('Test_route_map', '10', 
+                         'internet,local-AS,no-advertise,no-export,1:2', 
+                         session=session)
+        self.assertTrue(isinstance(reg_com, RegCom))
+        
+        
+class TestLiveSetRegCom(TestLiveSwitch):
+    """ This class defines live testing of set reg com"""
+    def test_set_reg_com(self):
+        session = self.login_to_switch()
+        set_reg_com = SetRegCom('Test_route_map', '10', 
+                         'additive,internet,local-AS,no-advertise',
+                         session=session)
+        self.assertTrue(isinstance(set_reg_com, SetRegCom))        
+
+
+class TestLiveRouteMapEntry(TestLiveSwitch):
+    """ This class defines live testing of route map entry"""
+    def test_route_map_entry(self):
+        session = self.login_to_switch()
+        rt_map_entry = RouteMapEntry(session=session)
+        self.assertTrue(isinstance(rt_map_entry, RouteMapEntry))
+
+
+class TestLiveRouteMap(TestLiveSwitch):
+    """ This class defines live testing of route map"""
+    def test_get_route_map(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, RouteMap.get, None)
+        route_map = RouteMap('Test_route_map', session=session)
+        self.assertTrue(isinstance(route_map, RouteMap))
+        
+
+class TestLiveRtPrefix(TestLiveSwitch):
+    """ This class defines live testing of route prefix"""
+    def test_rt_prefix(self):
+        session = self.login_to_switch()
+        rt_pfx = RtPrefix('1.2.3.4/8', session=session)
+        self.assertTrue(isinstance(rt_pfx, RtPrefix)) 
+        
+        
+class TestLivePrefixList(TestLiveSwitch):
+    """ This class defines live testing of prefix list"""
+    def test_get_prefixlist(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, PrefixList.get, None)
+        pfxlist = PrefixList('test_prefix', session=session)
+        self.assertTrue(isinstance(pfxlist, PrefixList))               
+
+
+class TestLiveAccessList(TestLiveSwitch):
+    """ This class defines live testing of access list"""
+    def test_access_list(self):
+        session = self.login_to_switch()
+        access_list = AccessList('testAccList', 'permit', '1234', 
+                                 session=session)
+        self.assertTrue(isinstance(access_list, AccessList))
+        
+        
+class TestLiveAsPath(TestLiveSwitch):
+    """ This class defines live testing of aspath"""
+    def test_get_aspath(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, AsPath.get, None)
+        aspath = AsPath('testAccList', session=session)
+        self.assertTrue(isinstance(aspath, AsPath))        
+        
+        
+class TestLiveCommunityItem(TestLiveSwitch):
+    """ This class defines live testing of community item"""
+    def test_community_item(self):
+        session = self.login_to_switch()
+        community_item = CommunityItem('internet', session=session)
+        self.assertTrue(isinstance(community_item, CommunityItem)) 
+        
+        
+class TestLiveCommunityEntry(TestLiveSwitch):
+    """ This class defines live testing of community entry"""
+    def test_community_entry(self):
+        session = self.login_to_switch()
+        community_entry = CommunityEntry('permit', 'internet,local-AS', 
+                                         session=session)
+        self.assertTrue(isinstance(community_entry, CommunityEntry))
+        
+        
+class TestLiveCommunityList(TestLiveSwitch):
+    """ This class defines live testing of community list"""
+    def test_get_comm_list(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, CommunityList.get, None)
+        Comm_list = CommunityList('comrule', 'standard', session=session)
+        self.assertTrue(isinstance(Comm_list, CommunityList))
+                
+        
+class TestLiveRPM(TestLiveSwitch):
+    """ This class defines live testing of rpm"""
+    def test_rpm(self):
+        session = self.login_to_switch()
+        self.assertRaises(TypeError, RPM.get, None)
+        rpm = RPM(session=session)
+        self.assertTrue(isinstance(rpm, RPM))
+                
 
 if __name__ == '__main__':
     
@@ -1126,6 +1940,14 @@ if __name__ == '__main__':
     offline.addTest(unittest.makeSuite(TestDns))
     offline.addTest(unittest.makeSuite(TestDnsVrf))
     offline.addTest(unittest.makeSuite(TestIcmp))
+    offline.addTest(unittest.makeSuite(TestIP))
+    offline.addTest(unittest.makeSuite(TestIPRoute))
+    offline.addTest(unittest.makeSuite(TestSTP))
+    offline.addTest(unittest.makeSuite(TestUdld))
+    offline.addTest(unittest.makeSuite(TestArp))
+    offline.addTest(unittest.makeSuite(TestRBAC))
+    offline.addTest(unittest.makeSuite(TestND))
+    offline.addTest(unittest.makeSuite(TestRPM))
     
     live = unittest.TestSuite()
     live.addTest(unittest.makeSuite(TestLivePortChannel))
@@ -1158,6 +1980,48 @@ if __name__ == '__main__':
     live.addTest(unittest.makeSuite(TestLiveDnsProvider))
     live.addTest(unittest.makeSuite(TestLiveDnsVrf))
     live.addTest(unittest.makeSuite(TestLiveIcmp))
+    live.addTest(unittest.makeSuite(TestLiveUdld))
+    live.addTest(unittest.makeSuite(TestLiveSTP))
+    live.addTest(unittest.makeSuite(TestLiveStpInterface))
+    live.addTest(unittest.makeSuite(TestLiveStpVlan))
+    live.addTest(unittest.makeSuite(TestLiveStpMst))
+    live.addTest(unittest.makeSuite(TestLiveARP))
+    live.addTest(unittest.makeSuite(TestLiveAaaRole))
+    live.addTest(unittest.makeSuite(TestLiveAaaUserRole))
+    live.addTest(unittest.makeSuite(TestLiveAaaUser))
+    live.addTest(unittest.makeSuite(TestLiveAaaRadiusProvider))
+    live.addTest(unittest.makeSuite(TestLiveAaaRadius))
+    live.addTest(unittest.makeSuite(TestLiveAaaTacacsProvider))
+    live.addTest(unittest.makeSuite(TestLiveAaaProviderRef))
+    live.addTest(unittest.makeSuite(TestLiveAaaTacacsProviderGroup))
+    live.addTest(unittest.makeSuite(TestLiveAaaTacacs))
+    live.addTest(unittest.makeSuite(TestLiveAaaAaa))
+    live.addTest(unittest.makeSuite(TestLiveRBAC))
+    live.addTest(unittest.makeSuite(TestLiveNdPrefix))
+    live.addTest(unittest.makeSuite(TestLiveNdInterface))
+    live.addTest(unittest.makeSuite(TestLiveND))
+    live.addTest(unittest.makeSuite(TestLiveMatchRtType))
+    live.addTest(unittest.makeSuite(TestLiveMatchRtTag))
+    live.addTest(unittest.makeSuite(TestLiveSetPeerAddr))
+    live.addTest(unittest.makeSuite(TestLiveSetNextHop))
+    live.addTest(unittest.makeSuite(TestLiveSetLocalPref))
+    live.addTest(unittest.makeSuite(TestLiveSetOrigin))
+    live.addTest(unittest.makeSuite(TestLiveSetCommList))
+    live.addTest(unittest.makeSuite(TestLiveRtMapRs))
+    live.addTest(unittest.makeSuite(TestLiveRtMapMatch))
+    live.addTest(unittest.makeSuite(TestLiveRegCom))
+    live.addTest(unittest.makeSuite(TestLiveSetRegCom))
+    live.addTest(unittest.makeSuite(TestLiveRouteMapEntry))
+    live.addTest(unittest.makeSuite(TestLiveRouteMap))
+    live.addTest(unittest.makeSuite(TestLiveRtPrefix))
+    live.addTest(unittest.makeSuite(TestLivePrefixList))
+    live.addTest(unittest.makeSuite(TestLiveAccessList))
+    live.addTest(unittest.makeSuite(TestLiveAsPath))
+    live.addTest(unittest.makeSuite(TestLiveCommunityItem))
+    live.addTest(unittest.makeSuite(TestLiveCommunityEntry))
+    live.addTest(unittest.makeSuite(TestLiveCommunityList))
+    live.addTest(unittest.makeSuite(TestLiveRPM))
+    
     
     full = unittest.TestSuite([live, offline])
     # Add tests to this suite while developing the tests

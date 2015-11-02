@@ -35,6 +35,10 @@ def main():
     description = '''Simple application that logs on to the
                     Switch and get ipv6 details.'''
     creds = NX.Credentials('switch', description)
+    
+    creds.add_argument('-v', '--version', type=str, default='v4',
+                       help='''IP version (Example: v4, v6), By default its v4''')
+
     args = creds.get()
 
     # Login to Switch
@@ -44,22 +48,23 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
 
-    # Get ipv6 datas from the switch
-    ipv6 = NX.IPV6.get(session)
-    
-    # Display ipv6 interface details
+    # Get IP infos. from the switch(default version is v4)
+    ipv = NX.IP.get(session, args.version)
+
+    # Display ip interface details
     template = "{0:15} {1:15} {2:32}"
     print(template.format(" Interface ", " Admin status ",
-                          " IPv6 addresses / Link-local address"))
+                          " IP%s addresses %s" % (args.version,
+                ('/ Link-local address' if 'v6' in args.version else ''))))
     print(template.format("-----------", "--------------",
                           "------------------------------------"))
-    for iface in ipv6.interfaces:
+    for iface in ipv.interfaces:
         print(template.format(iface.get_if_name(), iface.get_admin_st(),
                               iface.get_address()))
     
-    # Display ipv6 route details    
+    # Display ip route details
     template = "{0:20} {1:15} {2:15} {3:15} {4:15}"
-    for route in ipv6.routes:
+    for route in ipv.routes:
         print "\nRoute prefix : %s" % (route.prefix)
         for n_hop in route.next_hops:
             print(template.format("\tNext Hop Addr ", " Interface    ",

@@ -18,7 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and configure ipv6 on the 
+Simple application that logs on to the Switch and configure ipv4 on the 
 Interfaces.
 """
 import sys
@@ -34,7 +34,7 @@ def main():
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
     description = '''Simple application that logs on to the Switch and 
-                configure ipv6 on the Interfaces.'''
+                configure ipv4 on the Interfaces.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
@@ -51,7 +51,7 @@ def main():
     
     # Create a L3 port channel
     pc1 = NX.PortChannel('211', layer='Layer3')
-    
+
     # Create the port channel in the switch 
     # Note:(port channel should be exist in the switch before 
     # assigning IPv6 to it)
@@ -61,33 +61,37 @@ def main():
         print resp.text
         sys.exit(0)
     
-    ipv6 = NX.IP('v6')
-
+    # Create IPv4 instance
+    ipv4 = NX.IP()
+    
+    # Enable ip directed broadcast on the interface
+    ipv4.enable_directed_broadcast(int1)
+    
     # Add interfaces
-    ipv6.add_interface_address(int1, '2004:0DB8::1/10', link_local='FE83::1')
+    ipv4.add_interface_address(int1, '1.1.1.1/20')
     
     # Add port channel
-    ipv6.add_interface_address(pc1, '2022:0DB8::1/13')
-    
-    # Configure IPv6 route and Nexthop information
-    r1 = NX.IPRoute('2000:0::0/12', version='v6')
-    r1.add_next_hop('234E:44::1', int1, vrf='default', track_id='0', tag='1')
-    r1.add_next_hop('234E:44::4', pc1, vrf='default', track_id='1', tag='2')
+    ipv4.add_interface_address(pc1, '3.3.3.211/13')
 
-    # Add route to IPv6
-    ipv6.add_route(r1)
+    # Configure IPv4 route and Nexthop information
+    r1 = NX.IPRoute('4.4.4.4/32')
+    r1.add_next_hop('5.5.5.5', int1, vrf='default', track_id='0', tag='1')
+    r1.add_next_hop('7.7.7.7', pc1, vrf='default', track_id='1', tag='2')
+
+    # Add route to IPv4
+    ipv4.add_route(r1)
     
-    print ipv6.get_url()
-    print ipv6.get_json()
-    resp = session.push_to_switch(ipv6.get_url(), ipv6.get_json())
+    print ipv4.get_url()
+    print ipv4.get_json()
+    resp = session.push_to_switch(ipv4.get_url(), ipv4.get_json())
     if not resp.ok:
-        print ('%% Could not push to Switch')
+        print ('%% Could not push to Switch.')
         print resp.text
         sys.exit(0)
-    
+
     # Uncomment below to delete the resources
     '''
-    # Delete IPv6 route
+    # Delete IP route
     resp = session.delete(r1.get_delete_url())
     if not resp.ok:
         print ('%% Could not delete from Switch')

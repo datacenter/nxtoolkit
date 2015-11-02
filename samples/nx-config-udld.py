@@ -18,10 +18,11 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and enable features
+Simple application that logs on to the Switch and Configure UDLD
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
+
 
 def main():
     """
@@ -30,48 +31,51 @@ def main():
     :return: None
     """
     # Take login credentials from the command line if provided
-    # Otherwise, take them from your environment variables file ~/.profile    
+    # Otherwise, take them from your environment variables file ~/.profile
     description = '''Simple application that logs on to the
-                Switch and enable features'''
+                    Switch and Configure UDLD.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
-    
-    # Login to Switch
+
+    ''' Login to Switch '''
     session = NX.Session(args.url, args.login, args.password)
-    
     resp = session.login()
     if not resp.ok:
         print('%% Could not login to Switch')
-        sys.exit(0)  
+        sys.exit(0)
     
-    #Create Feature Base object
-    feature = NX.Feature(session)
-
-    feature.enable('bgp')
-    feature.enable('dhcp')
-    feature.enable('interface-vlan')
-    feature.enable('udld')
-    feature.enable('vrrp')
-    feature.enable('nxapi')
-    feature.enable('tacacsplus')
-    feature.enable('lacp')
+    udld = NX.UDLD() # Create UDLD instance
     
-    # Push entire configuration to switch
-    resp = session.push_to_switch(feature.get_url(), feature.get_json())
+    int = NX.Interface('eth1/2')
+    
+    udld.enable_aggress()
+    udld.disable_aggress(int)
+    
+    ''' Push UDLD configuration to the switch '''
+    resp = session.push_to_switch(udld.get_url(), udld.get_json())
     if not resp.ok:
-        print('%% Error: Could not push configuration to Switch')
-        print(resp.text)
-    
-    template = "{0:20} {1:16} {2:16}"
-    print(template.format("Feature Name", "Instance", "state"))
-    print(template.format("------------", "------------", 
-                          "------------"))
-    
+        print resp.text
+        print ('Could not push to Switch')
+        exit(0)
 
-    for data in feature.get():
-        print(template.format(data.name, data.instance, data.admin_st))
-    
+    # Uncomment below lines to delete UDLD configuration 
+    '''
+    resp = session.delete(udld.get_url())
+    if not resp.ok:
+        print('%% Could not delete from Switch')
+        sys.exit(0)
+    '''
+        
+    udld_data = NX.UDLD.get(session) # Pass interface to get specific 
+                                     # interface details
+    print "UDLD global configuration mode aggressive:", udld_data.aggress
+    print "UDLD global message interval:", udld_data.g_msg_int
+    template = "{0:12} {1:12}"
+    print template.format("Interface", "aggress")
+    print template.format("----------", "----------")
+    for (id, aggress) in zip(udld_data.i_faces,  udld_data.int_aggresses):
+        print template.format(id, aggress)
+
 
 if __name__ == '__main__':
-    main()    
-
+    main()

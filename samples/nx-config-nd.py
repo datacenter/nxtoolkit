@@ -18,8 +18,7 @@
 #                                                                              #
 ################################################################################
 """
-Simple application that logs on to the Switch and configure ipv6 on the 
-Interfaces.
+Simple application that logs on to the Switch and Configure Neighbor Discovery
 """
 import sys
 import nxtoolkit.nxtoolkit as NX
@@ -33,81 +32,71 @@ def main():
     """
     # Take login credentials from the command line if provided
     # Otherwise, take them from your environment variables file ~/.profile
-    description = '''Simple application that logs on to the Switch and 
-                configure ipv6 on the Interfaces.'''
+    description = '''Simple application that logs on to the
+                    Switch and Configure Neighbor Discovery.'''
     creds = NX.Credentials('switch', description)
     args = creds.get()
 
-    # Login to Switch
+    ''' Login to Switch '''
     session = NX.Session(args.url, args.login, args.password)
     resp = session.login()
     if not resp.ok:
         print('%% Could not login to Switch')
         sys.exit(0)
     
-    # Creating interface objects
-    # Note: interfaces should be L3 interface
-    int1 = NX.Interface('eth1/20')
+    nd = NX.ND() # Create ND instance
     
-    # Create a L3 port channel
-    pc1 = NX.PortChannel('211', layer='Layer3')
+    nd_int = NX.NdInterface('vlan123')
+    nd_int.disable_redirect()
+    nd_int.set_ra_interval('600')
+    nd_int.set_prefix('2000::/12', '100', '99')
     
-    # Create the port channel in the switch 
-    # Note:(port channel should be exist in the switch before 
-    # assigning IPv6 to it)
-    resp = session.push_to_switch(pc1.get_url(), pc1.get_json())
+    nd.add(nd_int)
+    
+    print nd.get_json()
+    ''' Push ND configuration to the switch '''
+    resp = session.push_to_switch(nd.get_url(), nd.get_json())
     if not resp.ok:
-        print ('%% Could create port channel in the Switch')
         print resp.text
-        sys.exit(0)
-    
-    ipv6 = NX.IP('v6')
-
-    # Add interfaces
-    ipv6.add_interface_address(int1, '2004:0DB8::1/10', link_local='FE83::1')
-    
-    # Add port channel
-    ipv6.add_interface_address(pc1, '2022:0DB8::1/13')
-    
-    # Configure IPv6 route and Nexthop information
-    r1 = NX.IPRoute('2000:0::0/12', version='v6')
-    r1.add_next_hop('234E:44::1', int1, vrf='default', track_id='0', tag='1')
-    r1.add_next_hop('234E:44::4', pc1, vrf='default', track_id='1', tag='2')
-
-    # Add route to IPv6
-    ipv6.add_route(r1)
-    
-    print ipv6.get_url()
-    print ipv6.get_json()
-    resp = session.push_to_switch(ipv6.get_url(), ipv6.get_json())
-    if not resp.ok:
-        print ('%% Could not push to Switch')
-        print resp.text
-        sys.exit(0)
-    
-    # Uncomment below to delete the resources
+        print ('Could not push to Switch')
+        exit(0)
+        
+    # Uncomment below lines to delete nd configuration of specific interface
     '''
-    # Delete IPv6 route
-    resp = session.delete(r1.get_delete_url())
+    nd_int = NX.NdInterface('vlan123')
+    resp = session.delete(nd_int.get_url())
     if not resp.ok:
-        print ('%% Could not delete from Switch')
-        print resp.text
-        sys.exit(0)
-   
-    # Delete from interface
-    resp = session.delete(ipv4.get_delete_url('eth1/20'))
-    if not resp.ok:
-        print ('%% Could not delete from Switch')
-        print resp.text
-        sys.exit(0)
-
-    resp = session.delete(ipv4.get_url())
-    if not resp.ok:
-        print ('%% Could not delete from Switch')
-        print resp.text
+        print('%% Could not delete from Switch')
         sys.exit(0)
     '''
-
-
+        
+    template = "{0:20} {1:20} {2:20}"
+    print template.format("Interface/Vlan", "Ra Interval", 
+                          "Redirection State")
+    print template.format("===============", "===============",
+                          "===============")
+    nd_data = NX.ND.get(session)
+    for int in nd_data.interfaces:
+        print template.format(int.id, int.ra_interval, int.redirect_st)
+        for prefix in int.prefixes:
+            print ("Prefix Address:%s\tlifetime:%s\tpreferred lifetime:%s" 
+                   % (prefix.address, prefix.lifetime, prefix.pref_lifetime))
+        print ("\n")
+        
+    # Uncomment below lines to get specific interface details
+    '''
+    int_data = NX.NdInterface.get(session, 'vlan123')
+    print template.format("Interface/Vlan", "Ra Interval", 
+                          "Redirection State")
+    print template.format("===============", "===============", 
+                          "===============")
+    print template.format(int_data.id, int_data.ra_interval, 
+                          int_data.redirect_st)
+    for prefix in int_data.prefixes:
+        print ("Prefix Address:%s\tlifetime:%s\tpreferred lifetime:%s" 
+               % (prefix.address, prefix.lifetime, prefix.pref_lifetime))
+    '''
+    
+        
 if __name__ == '__main__':
     main()

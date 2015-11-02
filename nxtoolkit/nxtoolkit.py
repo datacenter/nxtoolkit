@@ -4053,6 +4053,12 @@ class Vrrp(BaseNXObject):
         """
         return '/api/node/mo/sys/vrrp/inst.' + fmt
     
+    def get_delete_url(self):
+        """
+        :return: URL do delete for specific interface
+        """
+        return '/api/node/mo/sys/vrrp/inst/if-[%s].xml' % (self.interface.if_name)
+    
     @classmethod
     def get(self, session=None, interface_str=None):
         """
@@ -4199,25 +4205,32 @@ class Lacp(BaseNXObject):
                                           attributes=self._get_attributes())       
 
 
-class IPV6Interface(BaseNXObject):
+class IPInterface(BaseNXObject):
     """
-    This class defines ipv6s of an interface. 
+    This class defines IP (v4/v6) of an interface. 
     """
     def __init__(self, if_name, session=None, parent=None):
         """
         :param if_name: String representing interface i.e. eth1/2
+        :param session: Sessoin instance
+        :param parent: parent class instance
         """
         if not isinstance(if_name, str):
             raise TypeError('str instance expected')
         
         self._session = session
+        self.parent = parent
         self.interface = if_name
-        self.object = 'ipv6If'
+        self.obj_name = 'ip%sIf' % (parent.version)
         self._addresses = []
         self.if_name = if_name
         self.admin_st = None
         self.link_local_addr = None
-        super(IPV6Interface, self).__init__(name=self.if_name)
+        if parent.version == 'v4':
+            self.acl = None
+            self.dir_broadcast = None
+        super(IPInterface, self).__init__(name=self.if_name)
+
     def get_if_name(self):
         return self.if_name
 
@@ -4238,6 +4251,12 @@ class IPV6Interface(BaseNXObject):
     
     def get_address(self):
         return self._addresses
+    
+    def _set_dir_broadcast(self, status):
+        self.dir_broadcast = status
+    
+    def _set_acl(self, acl_name):
+        self.acl = acl_name
 
     def _get_attributes(self):
         att = {}
@@ -4246,6 +4265,9 @@ class IPV6Interface(BaseNXObject):
         if self.descr:
             att['descr'] = self.descr
         att['id'] = self.if_name
+        if self.parent.version == 'v4' and self.acl and self.dir_broadcast:
+            att['acl'] = self.acl
+            att['directedBroadcast'] = self.dir_broadcast
         return att
     
     def _get_json(self, class_obj, att=None):
@@ -4257,24 +4279,26 @@ class IPV6Interface(BaseNXObject):
         self.link_local_addr = addr
 
     def get_json(self):
-        resp = super(IPV6Interface,
-                     self).get_json(self.object,
+        resp = super(IPInterface,
+                     self).get_json(self.obj_name,
                                     attributes=self._get_attributes())
         addrs = []
         for addr in self._addresses:
             att = {'addr': addr}
-            addrs.append(self._get_json('ipv6Addr', att))
+            addrs.append(self._get_json('ip%sAddr' % (self.parent.version),
+                                        att))
         
         if self.link_local_addr:
             att = {'addr': self.link_local_addr}
-            addrs.append(self._get_json('ipv6LLaddr', att))
+            addrs.append(self._get_json('ip%sLLaddr' % (self.parent.version),
+                                        att))
 
-        resp[self.object]['children'] = addrs
+        resp[self.obj_name]['children'] = addrs
         return resp
-    
+
     def get_url(self, fmt='json'):
-        return ('/api/node/mo/sys/ipv6/inst/dom-default/if-[%s].%s'
-                % (self.interface.if_name, fmt))
+        return ('/api/node/mo/sys/ip%s/inst/dom-default/if-[%s].%s'
+                % (self.parent.version, self.interface.if_name, fmt))
 
     def get(self, session=None):
         """
@@ -4283,29 +4307,32 @@ class IPV6Interface(BaseNXObject):
         """
         if not session:
             session = self._session
-        query_url = ('/api/node/mo/sys/ipv6/inst/dom-default/if-[%s].json'
-                     '?query-target=children' % (self.if_name))
+        query_url = ('/api/node/mo/sys/ip%s/inst/dom-default/if-[%s].json'
+                     '?query-target=children' % (self.parent.version,
+                                                 self.if_name))
         
         resp = session.get(query_url).json()['imdata']
+        ipaddr = 'ip%sAddr' % (self.parent.version)
+        ipladdr = 'ip%sLLaddr' % (self.parent.version)
         for addr in resp:
-            if addr.get('ipv6Addr'):
-                address = str(addr['ipv6Addr']['attributes']['addr'])
+            if addr.get(ipaddr):
+                address = str(addr[ipaddr]['attributes']['addr'])
                 self.add_address(address)
-            if addr.get('ipv6LLaddr'):
-                self.link_local_addr = str(addr['ipv6LLaddr']['attributes']
+            if addr.get(ipladdr):
+                self.link_local_addr = str(addr[ipladdr]['attributes']
                                            ['addr'])
                 self.add_address(self.link_local_addr)
 
 
-class IPV6NextHop(object):
-    """This class defines IPv6 nexthop"""
-    def __init__(self, addr, interface, vrf, track_id, tag):
+class IPNextHop(object):
+    """This class defines IP(v4/v6) nexthop"""
+    def __init__(self, addr, interface, vrf, track_id, tag, parent):
         self.addr = addr
         self.i_face = interface
         self.vrf = vrf
         self.track_id = track_id
         self.tag = tag
-        self.object = 'ipv6Nexthop'
+        self.object = 'ip%sNexthop' % (parent.version)
     
     def _get_attributes(self):
         att = {}
@@ -4324,27 +4351,41 @@ class IPV6NextHop(object):
         return {self.object : { 'attributes': self._get_attributes()}}
 
 
-class IPV6Route(BaseNXObject):
+class IPRoute(BaseNXObject):
     """
-    This class defines Ipv6 Route
+    This class defines Ip (v4/v6) Route
     """
-    def __init__(self, prefix, name=None, parent=None, session=None):
-        
-        if not IPV6.is_valid_ipv6_address(prefix.split('/')[0]):
-            raise TypeError('Invalid prefix')
-        if not name:
-            name = ''
+    def __init__(self, prefix, version='v4', name='', parent=None, session=None):
 
         self._session = session
-        super(IPV6Route, self).__init__(name=name, parent=parent)
+        self._parent_cls = parent
+        if version.lower() not in ['v4', 'v6']:
+            raise TypeError('Ip version not supported')
+        
+        self.version = version
+        
+        if not IP.is_valid_ip(prefix.split('/')[0], self.version):
+            raise TypeError('Invalid prefix')
+
+        super(IPRoute, self).__init__(name=name, parent=parent)
         self.prefix = prefix
-        self.object = 'ipv6Route'
+        self.object = 'ip%sRoute' % (self.version)
         self.next_hops = []
+    
+    def get_delete_url(self, domain='default'):
+        """
+        This method has to be called after adding IPRoute instance in IP class
+        
+        :param fmt: String can be json or xml
+        :return url: String url to delete the ip/ipv6 route
+        """
+        return ('/api/node/mo/sys/ipv4/inst/dom-%s/rt-[%s].json' % (domain,
+                                                                  self.prefix))
 
     def get_json(self):
-        return super(IPV6Route, self).get_json(self.object,
+        return super(IPRoute, self).get_json(self.object,
                                             attributes=self._get_attributes())
-    
+
     def _get_attributes(self):
         att = {}
         att['prefix'] = self.prefix
@@ -4353,15 +4394,15 @@ class IPV6Route(BaseNXObject):
     def add_next_hop(self, addr, interface=None, vrf=None, track_id=None,
                      tag=None):
 
-        if not IPV6.is_valid_ipv6_address(addr):
-            raise TypeError('Invalid prefix')
+        if not IP.is_valid_ip(addr, self.version):
+            raise TypeError('Invalid prefix for IP' + self.version)
         
         if not isinstance(interface, (Interface, PortChannel)):
             raise TypeError('Interface or PortChannel instance expected')
         
         if not vrf:
             vrf = 'default'
-        next_hop = IPV6NextHop(addr, interface.if_name, vrf, track_id, tag)
+        next_hop = IPNextHop(addr, interface.if_name, vrf, track_id, tag, self)
         self._children.append(next_hop)
         self.next_hops.append(interface)
     
@@ -4375,148 +4416,229 @@ class IPV6Route(BaseNXObject):
         if not isinstance(session, Session):
             session = self._session
         
-        query_url = '/api/node/mo/sys/ipv6/inst/dom-%s/rt-[%s].json?query-target=children' %\
-        (self._parent.domain, self.prefix)
+        query_url = '/api/node/mo/sys/ip%s/inst/dom-%s/rt-[%s].json?query-target=children' %\
+        (self.version, self._parent_cls.domain, self.prefix)
         resp = session.get(query_url).json()['imdata']
+        ipnexthop = 'ip%sNexthop' % (self._parent.version)
         for n_hop in resp:
-            if n_hop.get('ipv6Nexthop'):
-                n_hop_obj = 'ipv6Nexthop'
-                addr = n_hop[n_hop_obj]['attributes']['nhAddr']
-                i_face = n_hop[n_hop_obj]['attributes']['nhIf']
-                vrf = n_hop[n_hop_obj]['attributes']['nhVrf']
-                track_id = n_hop[n_hop_obj]['attributes']['object']
-                tag = n_hop[n_hop_obj]['attributes']['tag']
-                next_hop = IPV6NextHop(addr, i_face, vrf, track_id, tag)
+            if n_hop.get(ipnexthop):
+                addr = n_hop[ipnexthop]['attributes']['nhAddr']
+                i_face = n_hop[ipnexthop]['attributes']['nhIf']
+                vrf = n_hop[ipnexthop]['attributes']['nhVrf']
+                track_id = n_hop[ipnexthop]['attributes']['object']
+                tag = n_hop[ipnexthop]['attributes']['tag']
+                next_hop = IPNextHop(addr, i_face, vrf, track_id, tag, self)
                 self.next_hops.append(next_hop)
 
 
-class IPV6(BaseNXObject):
+class IP(BaseNXObject):
     """
-    This class defines IPv6
+    This class defines IP (both v4 and v6)
     """
-    def __init__(self, name=None, session=None, parent=None):
+    def __init__(self, version='v4', domain='default', session=None, parent=None):
         """
-        :param name: String 
+        :param version: String represent ip version
+        :param dom_name: String represents domain name
         :param session: Session instance used for communicating with switch
         :param parent: parent class of this class
         """
         self._session = session
         self._parent = parent
-        if not name:
-            name = 'default'
-        super(IPV6, self).__init__(name=name)
+        if version.lower() not in ['v4', 'v6']:
+            raise TypeError('IP version is not supported')
+        
+        self.version = version.lower()
+
+        super(IP, self).__init__(name=domain)
         self.i_faces = []
-        self.cls_object = 'ipv6Dom'
-        self.domain = name
+        self.version = version.lower()
+        self.cls_object = 'ip%sDom' % (self.version)
+        self.domain = domain
         
         self.interfaces = []
         self.routes = []
     
     def get_url(self, fmt='json'):
-        return '/api/node/mo/sys/ipv6/inst/dom-%s.%s' % ( self.domain, fmt)
+        return '/api/node/mo/sys/ip%s/inst/dom-%s.%s' % (self.version,
+                                                        self.domain, fmt)
     
     def get_delete_url(self, i_face, fmt='json'):
-        return '/api/node/mo/sys/ipv6/inst/dom-%s/if-[%s].%s' % (self.domain,
-                                                                 i_face, fmt)
-    
+        return '/api/node/mo/sys/ip%s/inst/dom-%s/if-[%s].%s' % (self.version,
+            self.domain, i_face, fmt)
+
     def _get_attributes(self):
         att = {}
         att['name'] = self.domain
         return att
     
     @classmethod
-    def is_valid_ipv6_address(cls, address):
+    def is_valid_ip(cls, address, version):
         try:
-            socket.inet_pton(socket.AF_INET6, address)
+            if version == 'v6':
+                socket.inet_pton(socket.AF_INET6, address)
+            elif version == 'v4':
+                socket.inet_pton(socket.AF_INET, address)
         except socket.error:  # not a valid address
             return False
         return True
     
-    def add_interface_address(self, interface, addr, link_local=None):
+    def enable_directed_broadcast(self, interface, acl=""):
         """
-        :param interface: Interface instance
-        :param addr: String representing ipv6
-        :param link_local: string representing link local address
+        This method enables the ip directed broadcast on the interface
+        
+        :param interface: An Interface instance
+        :param acl: String representing acl name
+        
+        :return None
         """
+
+        if self.version != 'v4':
+            raise TypeError("Directed broadcast is not supported in IPv6")
+    
         if not isinstance(interface, (Interface, PortChannel)):
             raise TypeError('Interface or PortChannel instance expected')
         
-        if not IPV6.is_valid_ipv6_address(addr.split('/')[0]):
-            raise TypeError('Invalid address')
+        if interface.if_name in self.i_faces:
+            for ip_int in self._children:
+                ip_int._set_dir_broadcast('enabled')
+                ip_int._set_acl(acl)
+        else:
+            ip_int = IPInterface(interface.if_name, parent=self)
+            ip_int._set_dir_broadcast('enabled')
+            ip_int._set_acl(acl) 
+            self._children.append(ip_int)
+            self.i_faces.append(interface.if_name)
+
+    def disable_directed_broadcast(self, interface):
+        """
+        Disable ip directed broadcast
         
-        if link_local and not IPV6.is_valid_ipv6_address(link_local):
-            raise TypeError('Invalid address')
+        :param interface: Interface instance 
+        
+        :return None
+        """
+        if self.version != 'v4':
+            raise TypeError("Directed broadcast is not supported in IPv6")
+    
+        if not isinstance(interface, (Interface, PortChannel)):
+            raise TypeError('Interface or PortChannel instance expected')
         
         if interface.if_name in self.i_faces:
-            for ipv6_int in self._children:
-                if ipv6_int.if_name == interface.if_name:
-                    ipv6_int.add_address(addr)
+            for ip_int in self._children:
+                ip_int._set_dir_broadcast('disabled')
+
+    def add_interface_address(self, interface, addr, link_local=None):
+        """
+        :param interface: Interface instance
+        :param addr: String representing IP address
+        :param link_local: String representing link local address 
+               (only for ipv6)
+        """
+        if self.version == 'v4' and link_local:
+            raise TypeError('Link local is not applicable for ipv4')
+
+        if not isinstance(interface, (Interface, PortChannel)):
+            raise TypeError('Interface or PortChannel instance expected')
+        
+        if not IP.is_valid_ip(addr.split('/')[0], self.version):
+            raise TypeError('Invalid IP%s address' % (self.version))
+        
+        if link_local and not IP.is_valid_ip(link_local, self.version):
+            raise TypeError('Invalid link local')
+        
+        if interface.if_name in self.i_faces:
+            for ip_int in self._children:
+                if ip_int.if_name == interface.if_name:
+                    ip_int.add_address(addr)
                 if link_local:
-                    ipv6_int.set_link_local_addr(link_local)
+                    ip_int.set_link_local_addr(link_local)
         else:
-            ipv6_int = IPV6Interface(interface.if_name, parent=self)
+            ip_int = IPInterface(interface.if_name, parent=self)
             if link_local:
-                ipv6_int.set_link_local_addr(link_local)
-            ipv6_int.add_address(addr)
-            self._children.append(ipv6_int)
+                ip_int.set_link_local_addr(link_local)
+            ip_int.add_address(addr)
+            self._children.append(ip_int)
             self.i_faces.append(interface.if_name)
     
     def add_route(self, route):
-        """Add route capability to the configuration"""
-        if not isinstance(route, IPV6Route):
-            raise TypeError('IPV6Route instance expected')
+        """
+        Add route capability to the configuration
+        
+        :param route: IPRoute instance
+        :return None
+        """
+        if not isinstance(route, IPRoute):
+            raise TypeError('IPRoute instance expected')
+        
+        if route.version != self.version:
+            raise TypeError('IP Version mismatch')
+
         self._children.append(route)
         self.routes.append(route)
     
     def get_json(self):
-        return super(IPV6, self).get_json(self.cls_object,
+        return super(IP, self).get_json(self.cls_object,
                                           attributes=self._get_attributes())
 
     @classmethod
-    def get(cls, session, interface=None, domain=None):
+    def get(cls, session, version='v4', interface=None, domain=None):
         """
-        Get IPv6 details (interface / route)
+        Get IP details (interface and route)
 
         :param session: Session instance to commnunicate with switch
+        :param version: This method works based on version
         :param interface: String represents interface i.e. ethx/y
-        :return IPV6 object after storing interface and route details
+        :param domain: String representing domain name
+        
+        :return IP object after storing interface and route details
         """
         if not isinstance(session, Session):
             raise TypeError('An instance of Session class is required')
+
+        if version not in ['v4', 'v6']:
+            raise TypeError('IP version not supported')
         
+        version = version.lower()
         if not domain:
             domain = 'default'
+
         if interface:
             if 'eth' not in interface:
                 raise TypeError('Not a valid interface')
 
-            query_url = ('/api/node/mo/sys/ipv6/inst/dom-%s/if-[%s].json' 
-                         % (domain, interface))
+            query_url = ('/api/node/mo/sys/ip%s/inst/dom-%s/if-[%s].json'
+                         % (version, domain, interface))
         else:
-            query_url = ('/api/node/mo/sys/ipv6/inst/dom-%s.json?'
-                         'query-target=children' % (domain))
+            query_url = ('/api/node/mo/sys/ip%s/inst/dom-%s.json?'
+                         'query-target=children' % (version, domain))
         
         resp = session.get(query_url).json()['imdata']
         
-        ipv6 = IPV6(domain)
+        ip = IP(version, domain)
+        
+        ip_if = 'ip%sIf' % (version)
+        ip_route = 'ip%sRoute' % (version)
         for ifs in resp:
-            if ifs.get('ipv6If'):
-                if_name = str(ifs['ipv6If']['attributes']['id'])
-                admin_st = str(ifs['ipv6If']['attributes']['adminSt'])
-                desc = str(ifs['ipv6If']['attributes']['descr'])
-                ret_int = IPV6Interface(if_name, session=session)
-                ret_int.set_admin_st(admin_st)
-                ret_int.set_descr(desc)
+            if ifs.get(ip_if):
+                attr = ifs[ip_if]['attributes']
+                ret_int = IPInterface(str(attr['id']), session=session, parent=ip)
+                if version == 'v4':
+                    ret_int._set_acl(str(attr['acl']))
+                    ret_int._set_dir_broadcast(str(attr['directedBroadcast']))
+                ret_int.set_admin_st(str(attr['adminSt']))
+                ret_int.set_descr(str(attr['descr']))
                 ret_int.get()
-                ipv6.interfaces.append(ret_int)
+                ip.interfaces.append(ret_int)
                 
-            if ifs.get('ipv6Route'):
-                prefix = str(ifs['ipv6Route']['attributes']['prefix'])
-                route  = IPV6Route(prefix, parent=ipv6, session=session)
+            if ifs.get(ip_route):
+                attr = ifs[ip_route]['attributes']
+                prefix = str(attr['prefix'])
+                route  = IPRoute(prefix, version=version, parent=ip,
+                                 session=session)
                 route.get()
-                ipv6.routes.append(route)
+                ip.routes.append(route)
 
-        return ipv6
+        return ip
 
 
 class FeatureAttributes(object):
@@ -4650,6 +4772,9 @@ class DhcpRelay(object):
     def get_json(self):
         return {self.object : { "attributes" : self._get_attributes(), 
                                 "children" : self._get_child_attributes()}}
+        
+    def get_delete_url(self, interface, fmt='json'):
+        return '/api/node/mo/sys/dhcp/inst/relayif-[%s].%s' % (interface, fmt)
         
         
 class Dhcp(BaseNXObject):
@@ -5295,18 +5420,15 @@ class ICMP(BaseNXObject):
         super(ICMP, self).__init__(name="")
         self._session= session
         self._parent = parent
-        if version == 'v4':
-            self.version = 'icmpv4If'
-        elif version == 'v6':
-            self.version = 'icmpv6If'
-        else:
-            raise TypeError('provide proper version')
+        
+        if version not in ['v4', 'v6']:
+            raise TypeError
+
+        self.version = 'icmp%sIf' % (version)
         
         self.interface = interface
-        if ctrl:
-            self.ctrl = ctrl
-        else:
-            self.ctrl = ''
+        self.ctrl = ctrl
+        
         self.status = None
         self.id = None
         
@@ -5314,7 +5436,7 @@ class ICMP(BaseNXObject):
         att = {}
         if self.ctrl in ['', 'redirect']:
             att['ctrl'] = self.ctrl
-        return att 
+        return att
     
     def get_json(self):
         """
@@ -5325,12 +5447,8 @@ class ICMP(BaseNXObject):
         
     def get_url(self):
         """ Return Icmp url """
-        if self.version == 'icmpv4If':
-            return ('/api/node/mo/sys/icmpv4/inst/dom-default/if-[%s].json'% 
-                    self.interface.if_name)
-        elif self.version == 'icmpv6If':
-            return ('/api/node/mo/sys/icmpv6/inst/if-[%s].json'% 
-                    self.interface.if_name)
+        return ('/api/node/mo/sys/%s/inst/dom-default/if-[%s].json' % 
+                (self.version.replace('If', ''), self.interface.if_name))
             
     def _set_status(self, status):
         self.status = status
@@ -5362,8 +5480,7 @@ class ICMP(BaseNXObject):
     def get(cls, session, version=None):
         """
         :param session: Session object to communicate with Switch
-        :return list of list of icmp objects
-        Example: [[icmp1(v4), icmp2(v4), ..], [icmp3(v6)]]
+        :return list of icmp object
         """
         if not isinstance(session, Session):
             raise TypeError('An instance of Session class is required')
@@ -5384,4 +5501,2395 @@ class ICMP(BaseNXObject):
             cls._get(session, query_url2, 'v6', icmps)
             
         return icmps
+
+
+class StpMst(BaseNXObject):
+    """
+    This class defines STP Mst Entity configuration
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(StpMst, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.msten_obj = 'stpMstEntity'
+        self.simulate = None
+        self.hello_time = None
+        self.fwd_delay = None
+        self.max_age = None
+        
+    def set_simulate(self, simulate):
+        self.simulate = simulate
+    
+    def set_hello_time(self, hello_time):
+        ''' Currently not able to configure '''
+        self.hello_time = hello_time
+        
+    def set_fwd_delay(self, fwd_delay):
+        ''' Currently not able to configure '''
+        self.fwd_delay = fwd_delay
+        
+    def set_max_age(self, max_age):
+        ''' Currently not able to configure '''
+        self.max_age = max_age
+        
+    def _get_attributes(self):
+        att = {}
+        if self.simulate:
+            att['simulate'] = self.simulate
+        return att
+    
+    def get_json(self):
+        return super(StpMst, self).get_json(obj_class=self.msten_obj,
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Stp Mst Entity url """
+        return '/api/mo/sys/stp/inst/mstent.json'
+
+
+class StpVlan(BaseNXObject):
+    """
+    This class defines STP Vlan configuration
+    """
+    def __init__(self, id, session=None, parent=None):
+        super(StpVlan, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.vlan_obj = 'stpVlan'
+        self.id = id
+        self.admin_st = None
+        self.bdg_priority = None
+        
+        self.protocol = None
+        self.root_priority = None
+        self.root_addr = None
+        self.root_cost = None
+        self.root_port_no = None
+        self.bdg_addr = None
+        self.hello_time = None
+        self.fwd_delay = None
+        self.max_age = None
+        
+        
+    def set_admin_st(self, admin_st):
+        self.admin_st = admin_st
+        
+    def set_protocol(self, protocol):
+        ''' Currently not able to configure '''
+        self.protocol = protocol
+        
+    def set_root_pri(self, priority):
+        ''' Currently not able to configure '''
+        self.root_priority = priority
+        
+    def set_root_addr(self, address):
+        ''' Currently not able to configure '''
+        self.root_addr = address
+        
+    def set_root_cost(self, cost):
+        ''' Currently not able to configure '''
+        self.root_cost = cost
+        
+    def set_root_port_no(self, port_no):
+        ''' Currently not able to configure '''
+        self.root_port_no = port_no
+        
+    def set_bdg_addr(self, address):
+        ''' Currently not able to configure '''
+        self.bdg_addr = address
+        
+    def set_hello_time(self, hello_time):
+        ''' Currently not able to configure '''
+        self.hello_time = hello_time
+        
+    def set_fwd_delay(self, fwd_delay):
+        ''' Currently not able to configure '''
+        self.fwd_delay = fwd_delay
+        
+    def set_max_age(self, max_age):
+        ''' Currently not able to configure '''
+        self.max_age = max_age
+        
+    def _set_bdg_priority(self, priority):
+        self.bdg_priority = priority
+        
+    def set_bdg_priority(self, priority):
+        if not int(priority) in range (0, 61440):
+            if int(priority)%4096 != 0:
+                raise TypeError('Bridge priority must be multiple of 4096')
+            else:
+                raise TypeError('Bridge priority must be in range <0-61440>')
+        
+        self.bdg_priority = str(int(self.id) + int(priority))
+        
+    def _get_attributes(self):
+        att = {}
+        att['id'] = self.id
+        if self.admin_st:
+            att['adminSt'] = self.admin_st
+        if self.admin_st == 'enabled':
+            att['bridgePriority'] = self.bdg_priority
+        return att
+        
+    def get_json(self):
+        """
+       :returns: json response object
+        """
+        return super(StpVlan, self).get_json(obj_class=self.vlan_obj, 
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Stp Vlan url """
+        return '/api/mo/sys/stp/inst/vlan-%s.json'% self.id
+        
+        
+class StpInterface(BaseNXObject):
+    """
+    This class defines STP Interface configuration
+    """
+    
+    def __init__(self, id, session=None, parent=None):
+        super(StpInterface, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.if_obj = 'stpIf'
+        self.id = id
+        self.mode = 'default'
+        self.cost = None
+        self.priority = None
+        
+    def set_mode(self, mode):
+        self.mode = mode 
+    
+    def set_cost(self, cost):
+        self.cost = cost
+        
+    def set_priority(self, priority):
+        self.priority = priority
+        
+    def _get_attributes(self):
+        att = {}
+        att['id'] = self.id.if_name
+        if self.mode:
+            att['mode'] = self.mode
+        return att       
+        
+    def get_json(self):
+        return super(StpInterface, self).get_json(obj_class=self.if_obj,
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Stp Interface url """
+        return '/api/mo/sys/stp/inst/if-[%s].json'% self.id
+        
+    
+class STP(BaseNXObject):
+    """
+    This class defines STP configuration
+    """
+    
+    def __init__(self, session=None, parent=None):
+        super(STP, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.stp_obj = 'stpInst'
+        self.mode = None
+        self.port_type = 'normal'
+        self.msts = []
+        self.i_faces = []
+        self.vlans = []
+
+    def set_mode(self, mode):
+        self.mode = mode        
+    
+    def _set_port_type(self, port_type):
+        self.port_type = port_type
+        
+    def add_port_type(self, port_type):
+        if port_type in ['bpdufilter', 'bpduguard']:
+            self.port_type += ',' + 'extchp-' + port_type[:4] + '-' + \
+                              port_type[4:]
+        elif port_type == 'edge':
+            if "network" in self.port_type:
+                self.port_type = self.port_type.replace('network', 
+                                                        'extchp-edge')
+            else:
+                self.port_type += ',' + 'extchp-' + port_type[:4] 
+        elif port_type == 'network':
+            if "edge" in self.port_type:
+                self.port_type = self.port_type.replace('extchp-edge', 
+                                                        'network')
+            else:
+                self.port_type += ',' + port_type
+        else:
+            raise TypeError("provide proper mode")
+        
+    def add(self, stp_obj=None):
+        self._children.append(stp_obj)
+        if isinstance(stp_obj, StpMst):
+            self.msts.append(stp_obj)
+        if isinstance(stp_obj, StpInterface):
+            self.i_faces.append(stp_obj)
+        if isinstance(stp_obj, StpVlan):
+            self.vlans.append(stp_obj)
+        
+    def _get_attributes(self):
+        att = {}
+        att['ctrl'] = self.port_type
+        if self.mode:
+            att['mode'] = self.mode
+        return att 
+        
+    def get_json(self):
+        return super(STP, self).get_json(obj_class=self.stp_obj, 
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Stp Interface url """
+        return '/api/mo/sys/stp/inst.json'    
+    
+    @classmethod
+    def get(cls, session):
+        """
+        :param session: Session object to communicate with Switch
+        :return Dns object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        stp_obj = 'stpInst'
+        query_url = '/api/mo/sys/stp/inst.json?rsp-subtree=full'
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            stp = STP()
+            mode = ret[stp_obj]['attributes']['mode']
+            port_type = ret[stp_obj]['attributes']['ctrl']
+            stp.set_mode(mode)
+            stp._set_port_type(port_type)
+            if ret[stp_obj].get('children'):
+                for child in ret[stp_obj]['children']:
+                    if child.get('stpMstEntity'):
+                        mst_att = child['stpMstEntity']['attributes']
+                        stp_mst = StpMst()
+                        stp_mst.set_simulate(str(mst_att['simulate']))
+                        stp_mst.set_hello_time(str(mst_att['helloTime']))
+                        stp_mst.set_fwd_delay(str(mst_att['fwdTime']))
+                        stp_mst.set_max_age(str(mst_att['maxAge']))
+                        stp.add(stp_mst)
+                    elif child.get('stpVlan'):
+                        vlan_att = child['stpVlan']['attributes']
+                        stp_vlan = StpVlan(str(vlan_att['id']))
+                        stp_vlan.set_admin_st(str(vlan_att['adminSt']))
+                        stp_vlan.set_protocol(str(vlan_att['protocol']))
+                        stp_vlan.set_root_pri(str(vlan_att['rootPriority']))
+                        stp_vlan.set_root_addr(str(vlan_att['rootAddress']))
+                        stp_vlan.set_root_cost(str(vlan_att['rootPathCost']))
+                        stp_vlan.set_root_port_no(str(vlan_att['rootPort'
+                                                               'Number']))
+                        stp_vlan._set_bdg_priority(str(vlan_att['bridge'
+                                                                'Priority']))
+                        stp_vlan.set_bdg_addr(str(vlan_att['bridgeAddress']))
+                        stp_vlan.set_hello_time(str(vlan_att['helloTime']))
+                        stp_vlan.set_max_age(str(vlan_att['maxAge']))
+                        stp_vlan.set_fwd_delay(str(vlan_att['fwdTime']))
+                        stp.add(stp_vlan)
+                    elif child.get('stpIf'):
+                        int_att = child['stpIf']['attributes']
+                        stp_i_face = StpInterface(str(int_att['id']))
+                        stp_i_face.set_mode(str(int_att['mode']))
+                        stp_i_face.set_cost(str(int_att['cost']))
+                        stp_i_face.set_priority(str(int_att['priority']))
+                        stp.add(stp_i_face)
+        return stp
+                        
+                        
+class UDLD(BaseNXObject):
+    """
+    This class defines UDLD configuration
+    """
+    
+    def __init__(self, session=None):
+        super(UDLD, self).__init__(name="")
+        self._session= session
+        self.udld_obj = 'udldInst'
+        self.udld_int_obj = 'udldPhysIf'
+        self.aggress = None
+        self.int_aggress = None
+        self.i_face = None
+        self.int_aggresses = []
+        self.i_faces = []
+        self.g_msg_int = None
+    
+    def enable_aggress(self, i_face=None):
+        ''' 
+        If i_face not specified enables global aggress
+        If not, enables aggress of particular interface
+        '''
+        if not i_face:
+            self.aggress = 'enabled'
+        else:
+            self.int_aggress = 'enabled'
+            self.i_face = i_face
+    
+    def disable_aggress(self, i_face=None):
+        '''
+        If i_face not specified disables global aggress
+        If not, disables aggress of particular interface
+        '''
+        if not i_face:
+            self.aggress = 'disabled'
+        else:
+            self.int_aggress = 'disabled'
+            self.i_face = i_face 
+    
+    def set_g_msg_int(self, msg_int):
+        self.g_msg_int = msg_int
+    
+    def _get_attributes(self):
+        att = {}
+        if self.aggress:
+            att['aggressive'] = self.aggress
+        return att 
+    
+    def _get_child_attributes(self):
+        child = []
+        if self.int_aggress:
+            child.append({self.udld_int_obj: 
+                            {"attributes": 
+                                {'aggressive': self.int_aggress,
+                                 'id': self.i_face.if_name}}})
+        return child
+    
+    def get_json(self):
+        return super(UDLD, self).get_json(obj_class=self.udld_obj, 
+                                    attributes=self._get_attributes(),
+                                    children=self._get_child_attributes())
+
+    def get_url(self):
+        """ Return Udld url """
+        return '/api/mo/sys/udld/inst.json'   
+    
+    def _get_interface_details(self, resp):
+        udld_int_obj = 'udldPhysIf'
+        udld_int_attr = resp[udld_int_obj]['attributes']
+        aggress = str(udld_int_attr['aggressive'])
+        id = str(udld_int_attr['id'])
+        self.int_aggresses.append(aggress)
+        self.i_faces.append(id)
+
+    @classmethod
+    def get(cls, session, interface=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return UDLD object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        udld_obj = 'udldInst'
+        udld = UDLD()
+        if interface:
+            query_url = ('/api/mo/sys/udld/inst/physif-[eth1/2].json?rsp-sub'
+                         'tree=full')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:
+                udld._get_interface_details(ret)
+        else:
+            query_url = '/api/mo/sys/udld/inst.json?rsp-subtree=full'
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp: 
+                udld_att = ret[udld_obj]['attributes']
+                msg_int = str(udld_att['msgIntvl'])
+                udld.set_g_msg_int(msg_int)
+                aggress = str(udld_att['aggressive'])
+                if aggress == 'enabled':
+                    udld.enable_aggress()
+                else:
+                    udld.disable_aggress()
+                if ret[udld_obj].get('children'):
+                    for child in ret[udld_obj]['children']:
+                        udld._get_interface_details(child)
+        return udld
+           
+
+class ARP(BaseNXObject):
+    """
+    This class defines ARP configuration
+    """
+    def __init__(self, session=None):
+        super(ARP, self).__init__(name="")
+        self._session= session
+        self.arp_obj = 'arpInst'
+        self.timeout = '1500'
+        
+    def set_timeout(self, time):
+        self.timeout = time
+        
+    def _get_attributes(self):
+        att = {}
+        att['timeout'] = self.timeout
+        return att 
+    
+    def get_json(self):
+        return super(ARP, self).get_json(obj_class=self.arp_obj, 
+                                    attributes=self._get_attributes())
+        
+    def get_url(self):
+        """ Return Arp url """
+        return '/api/mo/sys/arp/inst.json'
+    
+    @classmethod
+    def get(cls, session):
+        """
+        :param session: Session object to communicate with Switch
+        :return ARP object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        arp_obj = 'arpInst'
+        arp = ARP()
+        query_url = '/api/mo/sys/arp/inst.json?rsp-subtree=full'
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            arp_att = ret[arp_obj]['attributes']
+            arp.set_timeout(str(arp_att['timeout']))
+        return arp    
+    
+    
+class AaaRole(BaseNXObject):
+    """
+    This class defines Role Creation
+    """
+    def __init__(self, name, session=None):
+        super(AaaRole, self).__init__(name)
+        self.role_obj = 'aaaRole'
+        self.name = name
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        return att
+    
+    def get_delete_url(self, name):
+        """ Return Delete Role url """
+        return '/api/node/mo/sys/userext/role-'+ name +'.json'
+    
+    def get_url(self):
+        """ Return Role url """
+        return '/api/node/mo/sys/userext/role-'+ self.name +'.json'
+    
+    def get_json(self):
+        return super(AaaRole, self).get_json(obj_class=self.role_obj, 
+                                    attributes=self._get_attributes())
+        
+        
+class AaaUserRole(BaseNXObject):        
+    """
+    This class defines User Role configuration
+    """
+    def __init__(self, name, user_role, session=None):
+        super(AaaUserRole, self).__init__(name)
+        self._session= session
+        self.role_obj = 'aaaUserRole'
+        self.domain_obj = 'aaaUserDomain'
+        self.user_role = user_role
+        self.name = name
+        
+    def _get_child_attributes(self):
+        child = []
+        child.append({self.role_obj: {"attributes":
+                                        {"name": self.user_role}}})
+        return child
+    
+    def _get_attributes(self):
+        att = {}
+        att['name'] = 'all'
+        att['dn'] = 'sys/userext/user-' + self.name + '/userdomain-all'
+        return att
+    
+    def get_delete_url(self, user_name, role):
+        """ Return Delete User Role url """
+        return ('/api/node/mo/sys/userext/user-' + user_name + '/userdomain-'
+                'all/role-' + role + '.json')
+    
+    def get_url(self):
+        """ Return User Role url """
+        return ('/api/node/mo/sys/userext/user-' + self.name + '/userdomain-'
+                'all/role-' + self.user_role + '.json')
+    
+    def get_json(self):
+        return super(AaaUserRole, self).get_json(obj_class=self.domain_obj,
+                                        attributes=self._get_attributes(),
+                                        children=self._get_child_attributes())
+        
+class AaaUser(BaseNXObject):
+    """
+    This class defines User configuration
+    """
+    def __init__(self, name, password=None, role='network-operator', 
+                 ssh_key=None, session=None, parent=None):
+        super(AaaUser, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.user_obj = 'aaaUser'
+        self.name = name
+        if password:
+            self.password = password
+        self.ssh_key = ssh_key
+        self._set_role(role)
+        self.user_roles = []
+            
+    def _set_role(self, role):
+        user_role = AaaUserRole(self.name, role)
+        self._children.append(user_role)
+        
+    def set_role(self, role):
+        self.role = role
+        self.user_roles.append(role)
+    
+    def set_ssh_key(self, key):
+        self.ssh_key = key
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        if self.password:
+            att['pwd'] = self.password
+            att['pwdSet'] = 'yes'
+        else:
+            att['pwdSet'] = 'no'
+        return att
+    
+    def _get_child_attributes(self):
+        child = []
+        if self.ssh_key:
+            ssh = {"aaaSshAuth": {"attributes": {'data': self.ssh_key}}}
+            child.append(ssh)
+        return child
+           
+    def get_url(self):
+        """ Return User url """
+        return '/api/node/mo/sys/userext/user-' + self.name + '.json'
+    
+    def get_json(self):
+        return super(AaaUser, self).get_json(obj_class=self.user_obj, 
+                                    attributes=self._get_attributes(),
+                                    children=self._get_child_attributes())
+    
+    @classmethod
+    def get(cls, session, username):
+        """
+        :param session: Session object to communicate with Switch
+        :return User object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        user_obj = 'aaaUser'
+        query_url = ('/api/node/mo/sys/userext/user-' + username + 
+                     '.json?rsp-subtree=full')
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            user_att = ret[user_obj]['attributes']
+            user = AaaUser(str(user_att['name']))
+            children = ret[user_obj]['children']
+            for child in children:
+                if child.get('aaaUserDomain'):
+                    for roles in child['aaaUserDomain']['children']:
+                        user.set_role(str(roles['aaaUserRole']['attributes']
+                                          ['name']))
+                elif child.get('aaaSshAuth'):
+                    user.set_ssh_key(str(child['aaaSshAuth']['attributes']
+                                         ['data']))
+        return user
+    
+        
+class AaaRadiusProvider(BaseNXObject):
+    """
+    This class defines Radius-server host configuration
+    """
+    def __init__(self, name, key=None, key_enc=None, retries=None, 
+                 timeout=None, session=None, parent=None):
+        super(AaaRadiusProvider, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.rad_prov_obj = 'aaaRadiusProvider'
+        self.name = name
+        self.key = key
+        self.key_enc = key_enc
+        self.retries = retries
+        self.timeout = timeout
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        if self.key:
+            att['key'] = self.key
+        if self.key_enc:
+            att['keyEnc'] = self.key_enc
+        if self.timeout:
+            att['timeout'] = self.timeout
+        if self.retries:
+            att['retries'] = self.retries
+        return att
+    
+    def get_delete_url(self, host_name):
+        """ Return Delete Radius-server host url """
+        return ('/api/node/mo/sys/userext/radiusext/radiusprovider-' +
+                host_name + '.json')
+    
+    def get_url(self):
+        """ Return Radius-server host url """
+        return ('/api/node/mo/sys/userext/radiusext/radiusprovider-' +
+                self.name + '.json')
+    
+    def get_json(self):
+        return super(AaaRadiusProvider, self).get_json(
+                                    obj_class=self.rad_prov_obj,
+                                    attributes=self._get_attributes())
+        
+        
+class AaaRadius(BaseNXObject):
+    """
+    This class defines Radius-server configuration
+    """
+    def __init__(self, session=None, parent=None):
+        super(AaaRadius, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.radius_obj = 'aaaRadiusEp'
+        self.retries = None
+        self.timeout = None
+        self.src_int = None
+        self.key = None
+        self.key_enc = None
+        self.servers = []
+        
+    def set_retries(self, retries):
+        self.retries = retries
+        
+    def set_timeout(self, timeout):
+        self.timeout = timeout
+    
+    def set_key(self, key, key_enc=None):
+        self.key = key
+        if key_enc:
+            self.key_enc = key_enc
+        
+    def set_src_interface(self, src_int):
+        self.src_int = src_int
+        
+    def add_host(self, name, key=None, key_enc=None, retries=None, 
+                 timeout=None):
+        host = AaaRadiusProvider(name, key, key_enc, retries, timeout)
+        self._children.append(host)
+        self.servers.append(host)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.key:
+            att['key'] = self.key
+        if self.key_enc:
+            att['keyEnc'] = self.key_enc
+        if self.src_int:
+            att['srcIf'] = self.src_int
+        if self.timeout:
+            att['timeout'] = self.timeout
+        if self.retries:
+            att['retries'] = self.retries
+        return att
+    
+    def get_url(self):
+        """ Return Radius-server url """
+        return '/api/node/mo/sys/userext/radiusext.json'
+    
+    def get_json(self):
+        return super(AaaRadius, self).get_json(obj_class=self.radius_obj,
+                                    attributes=self._get_attributes())
+        
+    @classmethod
+    def get(cls, session, host_name=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return Radius object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        rad_obj = 'aaaRadiusEp'
+        rad_prov_obj = 'aaaRadiusProvider'
+        radius = AaaRadius()
+        if host_name:
+            query_url = ('/api/node/mo/sys/userext/radiusext/radiusprovider-'
+                         + host_name + '.json')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:  
+                prov_att = ret[rad_prov_obj]['attributes']
+                radius.add_host(name=str(prov_att['name']),
+                                timeout=str(prov_att['timeout']), 
+                                retries=str(prov_att['retries']))
+        else:
+            query_url = ('/api/node/mo/sys/userext/radiusext.json?rsp-subtree'
+                         '=full')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:  
+                rad_att = ret[rad_obj]['attributes']
+                radius.set_retries(str(rad_att['retries']))
+                radius.set_timeout(str(rad_att['timeout']))
+                radius.set_src_interface(str(rad_att['srcIf']))
+                children = ret[rad_obj]['children']
+                for g_child in children:
+                    if g_child.get(rad_prov_obj):
+                        prov_att = g_child[rad_prov_obj]['attributes']
+                        radius.add_host(name=str(prov_att['name']),
+                                    timeout=str(prov_att['timeout']), 
+                                    retries=str(prov_att['retries']))
+        return radius
+
+
+class AaaTacacsProvider(BaseNXObject):
+    """
+    This class defines Tacacs+ server host configuration
+    """
+    def __init__(self, name, key=None, key_enc=None, port=None, 
+                 timeout=None, session=None, parent=None):
+        super(AaaTacacsProvider, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.tac_prov_obj = 'aaaTacacsPlusProvider'
+        self.name = name
+        self.key = key
+        self.key_enc = key_enc
+        self.port = port
+        self.timeout = timeout
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        if self.key:
+            att['key'] = self.key
+        if self.key_enc:
+            att['keyEnc'] = self.key_enc
+        if self.timeout:
+            att['timeout'] = self.timeout
+        if self.port:
+            att['port'] = self.port
+        return att
+    
+    def get_delete_url(self, host_name):
+        """ Return Delete Tacacs+ server host url """
+        return ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovider-' +
+                host_name + '.json')
+    
+    def get_url(self):
+        """ Return Tacacs+ server host url """
+        return ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovider-' +
+                self.name + '.json')
+    
+    def get_json(self):
+        return super(AaaTacacsProvider, self).get_json(
+                                    obj_class=self.tac_prov_obj,
+                                    attributes=self._get_attributes())
+
+
+class AaaProviderRef(BaseNXObject):
+    """
+    This class defines Tacacs+ server group configuration
+    """
+    def __init__(self, name, server, session=None):
+        super(AaaProviderRef, self).__init__(name)
+        self._session = session
+        self.prov_ref_obj = 'aaaProviderRef'
+        self.name = name
+        self.server = server
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.server
+        return att
+    
+    def get_delete_url(self, group_name, server):
+        """ Return Delete Tacacs+ server group url """
+        return ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovidergroup-'
+                 + group_name + '/providerref-' + server + '.json')
+    
+    def get_url(self):
+        """ Return Tacacs+ server group url """
+        return ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovidergroup-'
+                 + self.name + '/providerref-' + self.server + '.json')
+    
+    def get_json(self):
+        return super(AaaProviderRef, self).get_json(
+                                    obj_class=self.prov_ref_obj,
+                                    attributes=self._get_attributes())
+
+
+class AaaTacacsProviderGroup(BaseNXObject):
+    """
+    This class defines Tacacs+ group configuration
+    """
+    def __init__(self, name, vrf=None, deadtime=None, server=None, 
+                 session=None, parent=None):
+        super(AaaTacacsProviderGroup, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.tac_prov_grp_obj = 'aaaTacacsPlusProviderGroup'
+        self.name = name
+        self.vrf = vrf
+        self.deadtime = deadtime
+        self.server = server
+        self.grp_servers = []
+        self._create_server_host(name, server)
+        
+    def _create_server_host(self, grp_name, server):
+        ref = AaaProviderRef(grp_name,  server)
+        self._children.append(ref)
+        self.grp_servers.append(ref)
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        if self.vrf:
+            att['vrf'] = self.vrf
+        if self.deadtime:
+            att['deadtime'] = self.deadtime
+        return att
+    
+    def get_delete_url(self, group_name):
+        """ Return Delete Tacacs+ group url """
+        return ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovidergroup-'
+                + group_name + '.json')
+    
+    def get_url(self):
+        """ Return Tacacs+ group url """
+        return ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovidergroup-'
+                + self.name + '.json')
+    
+    def get_json(self):
+        return super(AaaTacacsProviderGroup, self).get_json(
+                                    obj_class=self.tac_prov_grp_obj,
+                                    attributes=self._get_attributes())
+
+
+class AaaTacacs(BaseNXObject):
+    """
+    This class defines Tacacs+ server configuration
+    """
+    def __init__(self, session=None, parent=None):
+        super(AaaTacacs, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.tacacs_obj = 'aaaTacacsPlusEp'
+        self.deadtime = None
+        self.timeout = None
+        self.src_int = None
+        self.key = None
+        self.key_enc = None
+        self.servers = []
+        self.groups = []
+        
+    def set_deadtime(self, deadtime):
+        self.deadtime = deadtime
+        
+    def set_timeout(self, timeout):
+        self.timeout = timeout
+    
+    def set_key(self, key, key_enc=None):
+        self.key = key
+        if key_enc:
+            self.key_enc = key_enc
+        
+    def set_src_interface(self, src_int):
+        self.src_int = src_int
+        
+    def add_host(self, name, key=None, key_enc=None, port=None, 
+                 timeout=None):
+        host = AaaTacacsProvider(name, key, key_enc, port, timeout)
+        self._children.append(host)
+        self.servers.append(host)
+        
+    def add_group(self, name, vrf=None, deadtime=None, server=None):
+        group = AaaTacacsProviderGroup(name, vrf, deadtime, server)
+        self._children.append(group)
+        self.groups.append(group)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.key:
+            att['key'] = self.key
+        if self.key_enc:
+            att['keyEnc'] = self.key_enc
+        if self.src_int:
+            att['srcIf'] = self.src_int
+        if self.timeout:
+            att['timeout'] = self.timeout
+        if self.deadtime:
+            att['deadtime'] = self.deadtime
+        return att
+    
+    def get_url(self):
+        """ Return Tacacs+ server url """
+        return '/api/node/mo/sys/userext/tacacsext.json'
+    
+    def get_json(self):
+        return super(AaaTacacs, self).get_json(obj_class=self.tacacs_obj,
+                                    attributes=self._get_attributes())
+        
+    def _get_grp_info(self, resp, tacacs):
+        tac_grp_obj = 'aaaTacacsPlusProviderGroup'
+        grp_att = resp[tac_grp_obj]['attributes']
+        if resp[tac_grp_obj].get('children'):
+            g_children = resp[tac_grp_obj]['children']
+            for gg_child in g_children:
+                if gg_child.get('aaaProviderRef'):
+                    server = str(gg_child['aaaProviderRef']['attributes']
+                                 ['name'])
+                if server:
+                    tacacs.add_group(name=str(grp_att['name']),
+                                     vrf=str(grp_att['vrf']),
+                                     deadtime=str(grp_att['deadtime']),
+                                     server=server)
+                else:
+                    tacacs.add_group(name=str(grp_att['name']), 
+                                     vrf=str(grp_att['vrf']),
+                                     deadtime=str(grp_att['deadtime']))
+        
+    @classmethod
+    def get(cls, session, host_name=None, grp_name=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return Tacacs object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        if host_name and grp_name:
+            raise TypeError('Provider either hostname or groupname')
+        tac_obj = 'aaaTacacsPlusEp'
+        tac_prov_obj = 'aaaTacacsPlusProvider'
+        tac_grp_obj = 'aaaTacacsPlusProviderGroup'
+        tacacs = AaaTacacs()
+        if host_name:
+            query_url = ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovid'
+                         'er-' + host_name + '.json?rsp-subtree=full')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:  
+                prov_att = ret[tac_prov_obj]['attributes']
+                tacacs.add_host(name=str(prov_att['name']),
+                                timeout=str(prov_att['timeout']), 
+                                port=str(prov_att['port']))
+        elif grp_name:
+            query_url = ('/api/node/mo/sys/userext/tacacsext/tacacsplusprovid'
+                         'ergroup-' + grp_name + '.json?rsp-subtree=full')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:
+                tacacs._get_grp_info(ret, tacacs)  
+            
+        else:
+            query_url = ('/api/node/mo/sys/userext/tacacsext.json?rsp-subtree'
+                         '=full')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:  
+                tac_att = ret[tac_obj]['attributes']
+                tacacs.set_deadtime(str(tac_att['deadtime']))
+                tacacs.set_timeout(str(tac_att['timeout']))
+                tacacs.set_src_interface(str(tac_att['srcIf']))
+                children = ret[tac_obj]['children']
+                for child in children:
+                    if child.get(tac_prov_obj):
+                        prov_att = child[tac_prov_obj]['attributes']
+                        tacacs.add_host(name=str(prov_att['name']),
+                                    timeout=str(prov_att['timeout']), 
+                                    port=str(prov_att['port']))
+                    elif child.get(tac_grp_obj):
+                        tacacs._get_grp_info(child, tacacs)
+        return tacacs
+    
+    
+class AaaAaa(BaseNXObject):        
+    """
+    This class defines User AAA configuration
+    """
+    def __init__(self, session=None, parent=None):
+        super(AaaAaa, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.aaa_obj = 'aaaAuthRealm'
+        self.errEn = None
+        self.auth_protocol = None
+        self.auth_prov_grp = None
+        self.cmd_type = 'exec'
+        self.author_prov_grp = None
+        self.acc_prov_grp = None
+     
+    def enable_auth_login(self, login_data):
+        if login_data == 'error-enable':
+            self.errEn = 'yes'
+        elif login_data == 'ascii-authentication':
+            self.auth_protocol = 'ascii'
+    
+    def disable_auth_login(self, login_data):
+        if login_data == 'error-enable':
+            self.errEn = 'no'
+        elif login_data == 'ascii-authentication':
+            self.auth_protocol = 'pap'
+            
+    def set_auth_default_grp(self, name=None):
+        if name:
+            self.auth_prov_grp = name
+        else:
+            self.auth_prov_grp = ''
+        
+    def set_author_default_grp(self, name=None, cmd_type=None):
+        if name:
+            self.author_prov_grp = name
+        else:
+            self.author_prov_grp = ''
+        if cmd_type in ['config', 'exec']:
+            self.cmd_type = cmd_type
+            
+    def set_acc_default_grp(self, name=None):
+        if name:
+            self.acc_prov_grp = name
+        else:
+            self.acc_prov_grp = ''
+        
+    def _get_child_attributes(self):
+        child = []
+        auth = {"aaaDefaultAuth":{"attributes":{}}}
+        auth['aaaDefaultAuth']['attributes'][
+                                'authProtocol'] = self.auth_protocol
+        auth['aaaDefaultAuth']['attributes'][
+                                'errEn'] = self.errEn
+        auth['aaaDefaultAuth']['attributes'][
+                                'providerGroup'] = self.auth_prov_grp
+        child.append(auth)
+        author = {"aaaDefaultAuthor":{"attributes": {}}}
+        author['aaaDefaultAuthor']['attributes'][
+                                'cmdType'] = self.cmd_type
+        author['aaaDefaultAuthor']['attributes'][
+                                'providerGroup'] = self.author_prov_grp
+        child.append(author)
+        acc = {"aaaDefaultAcc": {"attributes": {}}}
+        acc['aaaDefaultAcc']['attributes'][
+                                'providerGroup'] = self.acc_prov_grp
+        child.append(acc)
+        return child
+    
+    def get_url(self):
+        """ Return AAA url """
+        return '/api/node/mo/sys/userext/authrealm.json'
+       
+    def get_json(self):
+        return super(AaaAaa, self).get_json(obj_class=self.aaa_obj,
+                                        attributes={},
+                                        children=self._get_child_attributes())
+        
+    @classmethod
+    def get(cls, session):
+        """
+        :param session: Session object to communicate with Switch
+        :return AAA object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        aaa_obj = 'aaaAuthRealm'
+        aaa = AaaAaa()
+        query_url = '/api/node/mo/sys/userext/authrealm.json?rsp-subtree=full'
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            aaa_child = ret[aaa_obj]['children']
+            for child in aaa_child:
+                if child.get('aaaDefaultAuth'):
+                    auth_att = child['aaaDefaultAuth']['attributes']
+                    if not auth_att['providerGroup']:
+                        aaa.set_auth_default_grp(name='local')
+                    else:
+                        aaa.set_auth_default_grp(name=str(auth_att[
+                                                            'providerGroup']))
+                    if auth_att['authProtocol']=='ascii':
+                        aaa.enable_auth_login('ascii-authentication')
+                    else:
+                        aaa.disable_auth_login('ascii-authentication')
+                    if auth_att['errEn']=='yes':
+                        aaa.enable_auth_login('error-enable')
+                    else:
+                        aaa.disable_auth_login('error-enable')
+                                
+                elif child.get('aaaDefaultAuthor'):
+                    author_att = child['aaaDefaultAuthor']['attributes']
+                    if not author_att['providerGroup']:
+                        aaa.set_author_default_grp(name='local', 
+                                        cmd_type=str(author_att['cmdType']))
+                    else:
+                        aaa.set_author_default_grp(
+                                        name=str(author_att['providerGroup']),
+                                        cmd_type=str(author_att['cmdType']))
+                                    
+                elif child.get('aaaDefaultAcc'):
+                    acc_att = child['aaaDefaultAcc']['attributes']
+                    if not acc_att['providerGroup']:
+                        aaa.set_acc_default_grp('local')
+                    else:
+                        aaa.set_acc_default_grp(name=str(acc_att
+                                                         ['providerGroup']))
+        return aaa
+
+
+class RBAC(BaseNXObject):
+    """
+    This class defines RBAC configuration
+    """
+    def __init__(self, session=None, parent=None):
+        super(RBAC, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.rbac_obj = 'aaaUserEp'
+        self.pwd_max_len = None
+        self.pwd_min_len = None
+        self.pwd_secure_mode = None
+        self.pwd_strength_check = 'yes'
+        self.roles = []
+        self.users = []
+        
+    def set_pwd_max_length(self, max_len):
+        self.pwd_max_len = max_len
+        
+    def set_pwd_min_length(self, min_len):
+        self.pwd_min_len = min_len
+        
+    def enable_pwd_strength_check(self):
+        self.pwd_strength_check = 'yes'
+        
+    def disable_pwd_strength_check(self):
+        self.pwd_strength_check = 'no'
+        
+    def enable_pwd_secure_mode(self):
+        self.pwd_secure_mode = 'yes'
+    
+    def disable_pwd_secure_mode(self):
+        self.pwd_secure_mode = 'no'
+        
+    def create_role(self, name):
+        role = AaaRole(name)
+        self._children.append(role)
+        self.roles.append(role)
+        
+    def add(self, obj):
+        self._children.append(obj)
+        if isinstance(obj, AaaUser):
+            self.users.append(obj)
+                 
+    def _get_attributes(self):
+        att = {}
+        if self.pwd_max_len:
+            att['pwdMaxLength'] = self.pwd_max_len
+        if self.pwd_min_len:
+            att['pwdMinLength'] = self.pwd_min_len
+        if self.pwd_secure_mode:
+            att['pwdSecureMode'] = self.pwd_secure_mode
+        if self.pwd_strength_check:
+            att['pwdStrengthCheck'] = self.pwd_strength_check
+        return att 
+    
+    def get_url(self):
+        """ Return RBAC url """
+        return '/api/node/mo/sys/userext.json'
+    
+    def get_json(self):
+        return super(RBAC, self).get_json(obj_class=self.rbac_obj, 
+                                    attributes=self._get_attributes())
+        
+    @classmethod
+    def get(cls, session, role_name=None):
+        """
+        :param session: Session object to communicate with Switch
+        :return RBAC object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        rbac_obj = 'aaaUserEp'
+        rbac = RBAC()
+        if role_name:
+            query_url = ('/api/node/mo/sys/userext/role-' + role_name + 
+                         '.json?rsp-subtree=full')
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp: 
+                rbac.create_role(str(ret['aaaRole']['attributes']['name']))
+        else:       
+            query_url = '/api/node/mo/sys/userext.json?rsp-subtree=full'
+            resp = session.get(query_url).json()['imdata']
+            for ret in resp:  
+                rbac_att = ret[rbac_obj]['attributes']
+                rbac.set_pwd_max_length(str(rbac_att['pwdMaxLength']))
+                rbac.set_pwd_min_length(str(rbac_att['pwdMinLength']))
+                if rbac_att['pwdSecureMode'] == 'yes':
+                    rbac.enable_pwd_secure_mode()
+                else:
+                    rbac.disable_pwd_secure_mode
+                if rbac_att['pwdStrengthCheck'] == 'yes':
+                    rbac.enable_pwd_strength_check()
+                else:
+                    rbac.disable_pwd_strength_check()
+            
+                if ret[rbac_obj].get('children'):
+                    for child in ret[rbac_obj]['children']:
+                        if child.get('aaaRole'):
+                            rbac.create_role(str(child['aaaRole']
+                                                 ['attributes']['name']))
+                        if child.get('aaaUser'):
+                            user_att = child['aaaUser']['attributes']
+                            user = AaaUser(str(user_att['name']))
+                            children = child['aaaUser']['children']
+                            for g_child in children:
+                                if g_child.get('aaaUserDomain'):
+                                    for roles in g_child['aaaUserDomain'][
+                                                                'children']:
+                                        user.set_role(str(roles['aaaUserRole']
+                                                      ['attributes']['name']))
+                                if g_child.get('aaaSshAuth'):
+                                    user.set_ssh_key(str(g_child['aaaSshAuth']
+                                                    ['attributes']['data']))
+                            rbac.add(user)
+                                
+        return rbac
+    
+
+class NdPrefix(BaseNXObject):
+    """
+    This class defines neighbor discovery prefix configuration
+    """
+    def __init__(self, int, address, lifetime=None, pref_lifetime=None, 
+                 session=None, parent=None):
+        super(NdPrefix, self).__init__(name="")
+        self.prefix_obj = 'ndPfx'
+        self.address = address
+        self.int = int
+        self.lifetime = lifetime
+        self.pref_lifetime = pref_lifetime
+        
+    def _get_attributes(self):
+        att = {}
+        att['addr'] = self.address
+        if self.lifetime and self.pref_lifetime:
+            att['lifetime'] = self.lifetime
+            att['prefLifetime'] = self.pref_lifetime
+        return att
+    
+    def get_url(self):
+        """ Return Neighbor Discovery interface prefix url """
+        return ('/api/node/mo/sys/nd/inst/dom-default/if-[' + self.int + 
+                ']/pfx-[' + self.address + '].json')
+    
+    def get_json(self):
+        return super(NdPrefix, self).get_json(obj_class=self.prefix_obj, 
+                                    attributes=self._get_attributes())
+
+    
+class NdInterface(BaseNXObject):
+    """
+    This class defines neighbor discovery interface configuration
+    """
+    def __init__(self, id, session=None, parent=None):
+        super(NdInterface, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.nd_int_obj = 'ndIf'
+        self.id = id
+        self.redirect_st = None
+        self.ra_interval = None
+        self.prefixes = []
+        
+    def set_ra_interval(self, interval):
+        self.ra_interval = interval
+        
+    def enable_redirect(self):
+        self.redirect_st = 'redirects'
+    
+    def disable_redirect(self):
+        self.redirect_st = '-'
+        
+    def set_prefix(self, address, lifetime=None, pref_lifetime=None):
+        if lifetime and not pref_lifetime:
+            raise TypeError("Provide both lifetime and preferred lifetime")
+        elif lifetime and (int(lifetime) < int(pref_lifetime)):
+            print lifetime, pref_lifetime
+            raise TypeError("lifetime must be greater than or equal to "
+                            + "preferred lifetime")
+        prefix = NdPrefix(self.id, address, lifetime, pref_lifetime)
+        self._children.append(prefix)
+        self.prefixes.append(prefix)
+    
+    def _get_attributes(self):
+        att = {}
+        att['id'] = self.id
+        if self.redirect_st == '-':
+            self.redirect_st = ''
+        if self.redirect_st in ['', 'redirects']:
+            att['ctrl'] = self.redirect_st
+        if self.ra_interval:
+            att['raIntvl'] = self.ra_interval
+        return att
+    
+    def get_url(self):
+        """ Return Neighbor Discovery Interface url """
+        return ('/api/node/mo/sys/nd/inst/dom-default/if-[' + self.id + 
+                '].json')
+    
+    def get_json(self):
+        return super(NdInterface, self).get_json(obj_class=self.nd_int_obj, 
+                                    attributes=self._get_attributes())
+        
+    def _get_int_details(self, nd_iface, resp):
+        nd_int_obj = 'ndIf'
+        int_att = resp[nd_int_obj]['attributes']
+        nd_iface.set_ra_interval(str(int_att['raIntvl']))
+        if str(int_att['ctrl']) == 'redirects':
+            nd_iface.enable_redirect()
+        else:
+            nd_iface.disable_redirect()
+        nd_iface.set_ra_interval(str(int_att['raIntvl']))
+        if resp[nd_int_obj].get('children'):
+            for child in resp[nd_int_obj]['children']:
+                pre_att = child['ndPfx']['attributes']
+                nd_iface.set_prefix(str(pre_att['addr']), 
+                                    str(pre_att['lifetime']),
+                                    str(pre_att['prefLifetime']))
+        
+    @classmethod
+    def get(cls, session, interface):
+        """
+        :param session: Session object to communicate with Switch
+        :return ND Interface object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        nd_int_obj = 'ndIf'
+        query_url = ('/api/node/mo/sys/nd/inst/dom-default/if-[' + interface 
+                     + '].json?rsp-subtree=full')
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp: 
+            int_att = ret[nd_int_obj]['attributes']
+            nd_iface = NdInterface(str(int_att['id']))
+            nd_iface._get_int_details(nd_iface, ret)
+            return nd_iface
+        
+    
+class ND(BaseNXObject):
+    """
+    This class defines neighbor discovery configuration
+    """
+    def __init__(self, session=None, parent=None):
+        super(ND, self).__init__(name="")
+        self._session= session
+        self._parent = parent
+        self.nd_obj = 'ndDom'
+        self.interfaces = []
+    
+    def add(self, int_obj):
+        self._children.append(int_obj)
+        self.interfaces.append(int_obj)
+        
+    def get_url(self):
+        """ Return Neighbor Discovery url """
+        return '/api/node/mo/sys/nd/inst/dom-default.json'
+    
+    def get_json(self):
+        return super(ND, self).get_json(obj_class=self.nd_obj, 
+                                    attributes={})
+        
+    @classmethod
+    def get(cls, session):
+        """
+        :param session: Session object to communicate with Switch
+        :return ND object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        nd_obj = 'ndDom'
+        nd_int_obj = 'ndIf'
+        nd = ND()
+        query_url = ('/api/node/mo/sys/nd/inst/dom-default.json?rsp-' + 
+                         'subtree=full')
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            nd_int = ret[nd_obj]['children']
+            for child in nd_int:
+                int_att = child[nd_int_obj]['attributes']
+                nd_iface = NdInterface(str(int_att['id']))
+                nd_iface._get_int_details(nd_iface, child)
+                nd.add(nd_iface)
+        return nd
+                    
+            
+class MatchRtType(BaseNXObject):
+    """
+    This class defines match route type configuration
+    """
+    def __init__(self, name, seq_no, type, session=None, parent=None):
+        super(MatchRtType, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.rt_type_obj = 'rtmapMatchRtType'
+        self.name = name
+        self.seq_no = seq_no
+        self.type = type
+        
+    def _get_attributes(self):
+        att = {}
+        att['routeT'] = self.type
+        return att
+        
+    def get_url(self):
+        """ Return match route type url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/mrttype-' + self.type + '.json')
+        
+    def get_json(self):
+        return super(MatchRtType, self).get_json(obj_class=self.rt_type_obj,
+                                            attributes=self._get_attributes())
+                                            
+                                            
+class MatchRtTag(BaseNXObject):
+    """
+    This class defines match route tag configuration
+    """
+    def __init__(self, name, seq_no, tag, session=None, parent=None):
+        super(MatchRtTag, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.rt_tag_obj = 'rtmapMatchRtTag'
+        self.name = name
+        self.seq_no = seq_no
+        self.tag = tag
+        
+    def _get_attributes(self):
+        att = {}
+        att['tag'] = self.tag
+        return att
+        
+    def get_url(self):
+        """ Return match route tag url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/mrttag-' + self.tag + '.json')
+        
+    def get_json(self):
+        return super(MatchRtTag, self).get_json(obj_class=self.rt_tag_obj,
+                                            attributes=self._get_attributes())
+                                            
+
+class SetPeerAddr(BaseNXObject):
+    """
+    This class defines set peer address configuration
+    """
+    def __init__(self, name, seq_no, version='v4', state='disabled', 
+                 session=None, parent=None):
+        super(SetPeerAddr, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.peer_obj = 'rtmapSetNhPeerAddr'
+        self.name = name
+        self.seq_no = seq_no
+        self.version = version
+        self.state = state
+        
+    def _get_attributes(self):
+        att = {}
+        if self.version == 'v4':
+            att['v4PeerAddr'] = self.state
+        if self.version == 'v6':
+            att['v6PeerAddr'] = self.state
+        return att
+        
+    def get_url(self):
+        """ Return set peer address url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/nhpa.json')
+        
+    def get_json(self):
+        return super(SetPeerAddr, self).get_json(obj_class=self.peer_obj,
+                                            attributes=self._get_attributes())
+                                            
+                                            
+class SetNextHop(BaseNXObject):
+    """
+    This class defines set next hop address configuration
+    """
+    def __init__(self, name, seq_no, addr, session=None, parent=None):
+        super(SetNextHop, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.nh_obj = 'rtmapSetNh'
+        self.name = name
+        self.seq_no = seq_no
+        self.addr = addr
+        
+    def _get_attributes(self):
+        att = {}
+        att['addr'] = self.addr
+        return att
+        
+    def get_url(self):
+        """ Return set next hop address url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/nh-[' + self.addr + '].json')
+        
+    def get_json(self):
+        return super(SetNextHop, self).get_json(obj_class=self.nh_obj,
+                                            attributes=self._get_attributes())
+                                            
+                                                            
+class SetLocalPref(BaseNXObject):
+    """
+    This class defines set local preference configuration
+    """
+    def __init__(self, name, seq_no, local_pref, session=None, parent=None):
+        super(SetLocalPref, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.pref_obj = 'rtmapSetPref'
+        self.name = name
+        self.seq_no = seq_no
+        self.local_pref = local_pref
+        
+    def _get_attributes(self):
+        att = {}
+        att['localPref'] = self.local_pref
+        return att
+        
+    def get_url(self):
+        """ Return set local preference url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/spref.json')
+        
+    def get_json(self):
+        return super(SetLocalPref, self).get_json(obj_class=self.pref_obj,
+                                            attributes=self._get_attributes())
+                                            
+                                                
+class SetOrigin(BaseNXObject):
+    """
+    This class defines set origin configuration
+    """
+    def __init__(self, name, seq_no, origin, session=None, parent=None):
+        super(SetOrigin, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.origin_obj = 'rtmapSetOrigin'
+        self.name = name
+        self.seq_no = seq_no
+        self.origin = origin
+        
+    def _get_attributes(self):
+        att = {}
+        att['originT'] = self.origin
+        return att
+        
+    def get_url(self):
+        """ Return set origin url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/origin.json')
+        
+    def get_json(self):
+        return super(SetOrigin, self).get_json(obj_class=self.origin_obj,
+                                            attributes=self._get_attributes())
+                                            
+                                            
+class SetCommList(BaseNXObject):
+    """
+    This class defines set community-list configuration
+    """
+    def __init__(self, name, seq_no, comm_name, delete=None, session=None, 
+                 parent=None):
+        super(SetCommList, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.comm_obj = 'rtmapSetCommList'
+        self.name = name
+        self.seq_no = seq_no
+        self.comm_name = comm_name
+        if delete:
+            self.delete = 'enabled'
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.comm_name
+        if self.delete:
+            att['delete'] = self.delete
+        else:
+            att['delete'] = 'disabled'
+        return att
+        
+    def get_url(self):
+        """ Return set community-list url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/scommlist.json')
+        
+    def get_json(self):
+        return super(SetCommList, self).get_json(obj_class=self.comm_obj,
+                                            attributes=self._get_attributes())
+                                            
+
+class RtmapRs(BaseNXObject):
+    """
+    This class defines Route-map Match name configuration
+    """
+    def __init__(self, name, seq_no, rs_obj, rs_name, session=None, 
+                 parent=None):
+        super(RtmapRs, self).__init__(name=rs_name)
+        self._session= session
+        self._parent = parent
+        self.name = name
+        self.seq_no = seq_no
+        self.rs_obj = rs_obj
+        self.rs_name = rs_name
+        
+    def _get_attributes(self):
+        att = {}
+        if self.rs_obj == 'rtmapRsRtAsPathAccAtt':
+            att['tDn'] = 'sys/rpm/accesslist-' + self.rs_name 
+        elif self.rs_obj == 'rtmapRsRtDstAtt':
+            att['tDn'] = 'sys/rpm/pfxlistv4-' + self.rs_name
+        elif self.rs_obj == 'rtmapRsRtDstV6Att':
+            att['tDn'] = 'sys/rpm/pfxlistv6-' + self.rs_name
+        elif self.rs_obj == 'rtmapRsRegCommAtt':
+            att['tDn'] = 'sys/rpm/rtregcom-' + self.rs_name
+        return att
+        
+    def get_url(self):
+        """ Return Route-map Match name url """
+        if self.rs_obj == 'rtmapRsRtAsPathAccAtt':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mrtacclist/rsrtAsPathAccAtt-[sys/rpm/' + 
+                    'accesslist-' + self.rs_name + '].json')
+        elif self.rs_obj == 'rtmapRsRtDstAtt':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mrtdst/rsrtDstAtt-[sys/rpm/pfxlistv4-' + 
+                    self.rs_name + '].json')
+        elif self.rs_obj == 'rtmapRsRtDstV6Att':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mrtdstv6/rsrtDstV6Att-[sys/rpm/pfxlistv6-'
+                    + self.rs_name + '].json')
+        elif self.rs_obj == 'rtmapRsRegCommAtt':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mregcomm/rsregCommAtt-[sys/rpm/rtregcom-'
+                    + self.rs_name + '].json')
+        
+    def get_json(self):
+        return super(RtmapRs, self).get_json(obj_class=self.rs_obj,
+                                            attributes=self._get_attributes())
+        
+
+class RtmapMatch(BaseNXObject):
+    """
+    This class defines Route-map Match configuration
+    """
+    def __init__(self, name, seq_no, match_obj, match_name, 
+                 match_criteria=None, session=None, parent=None):
+        super(RtmapMatch, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.name = name
+        self.seq_no = seq_no
+        self.match_obj = match_obj
+        self.criteria = match_criteria
+        if self.match_obj == 'rtmapMatchAsPathAccessList':
+            self.child_obj = 'rtmapRsRtAsPathAccAtt'
+        elif self.match_obj == 'rtmapMatchRtDst':
+            self.child_obj = 'rtmapRsRtDstAtt'
+        elif self.match_obj == 'rtmapMatchRtDstV6':
+            self.child_obj = 'rtmapRsRtDstV6Att'
+        elif self.match_obj == 'rtmapMatchRegComm':
+            self.child_obj = 'rtmapRsRegCommAtt'
+        else:
+            raise TypeError("Provide proper object name")
+        self.matches = []
+        self.add(self.child_obj, match_name)
+        
+    def add(self, match_child_obj, match_name):
+        rtmaprs = RtmapRs(self.name, self.seq_no, match_child_obj, match_name)
+        self._children.append(rtmaprs)
+        self.matches.append(rtmaprs)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.criteria:
+            att['criteria'] = self.criteria
+        return att
+        
+    def get_url(self):
+        """ Return Route-map Match url """
+        if self.match_obj == 'rtmapMatchAsPathAccessList':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mrtacclist.json')
+        elif self.match_obj == 'rtmapMatchRtDst':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mrtdst.json')
+        elif self.match_obj == 'rtmapMatchRtDstV6':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mrtdstv6.json')
+        elif self.match_obj == 'rtmapMatchRegComm':
+            return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                    self.seq_no + '/mregcomm.json')
+        
+    def get_json(self):
+        return super(RtmapMatch, self).get_json(obj_class=self.match_obj,
+                                            attributes=self._get_attributes())
+
+
+class RegCom(BaseNXObject):
+    """
+    This class defines community configuration
+    """
+    def __init__(self, name, seq_no, community, session=None, parent=None):
+        super(RegCom, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.comm_obj = 'rtregcomItem'
+        self.name = name
+        self.seq_no = seq_no
+        if community == 'internet':
+            self.community = '0:0'
+        elif community == 'local-AS':
+            self.community = '65535:65283'
+        elif community == 'no-advertise':
+            self.community = '65535:65282'
+        elif community == 'no-export':
+            self.community = '65535:65281'
+        else:
+            self.community = community
+            
+    def _get_attributes(self):
+        att = {}
+        att['community'] = 'regular:as2-nn2:' + self.community
+        return att
+        
+    def get_url(self):
+        """ Return set community url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/sregcomm/item-regular:as2-nn2:' + 
+                self.community +'.json')
+        
+    def get_json(self):
+        return super(RegCom, self).get_json(obj_class=self.comm_obj,
+                                            attributes=self._get_attributes())
+        
+
+class SetRegCom(BaseNXObject):
+    """
+    This class defines set community configuration
+    """
+    def __init__(self, name, seq_no, community, session=None, parent=None):
+        super(SetRegCom, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.comm_obj = 'rtmapSetRegComm'
+        self.name = name
+        self.seq_no = seq_no
+        community = community.split(',')
+        if 'additive' in community:
+            self.additive = 'enabled'
+            community.remove('additive')
+        else:
+            self.additive = None
+        self.communities = []
+        self.add_comm_item(community)
+        
+    def add_comm_item(self, community):
+        for comm in community:
+            reg_comm = RegCom(self.name, self.seq_no, comm)
+            self._children.append(reg_comm)
+            self.communities.append(reg_comm)
+        
+    def _get_attributes(self):
+        att = {}
+        if self.additive:
+            att['additive'] = self.additive
+        else:
+            att['additive'] = 'disabled'
+        return att
+        
+    def get_url(self):
+        """ Return set community url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/sregcomm.json')
+        
+    def get_json(self):
+        return super(SetRegCom, self).get_json(obj_class=self.comm_obj,
+                                            attributes=self._get_attributes())
+
+
+class RouteMapEntry(BaseNXObject):
+    """
+    This class defines Route-map entry configuration
+    """
+    def __init__(self, action='permit', seq_no='10', session=None, 
+                 parent=None):
+        super(RouteMapEntry, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.rtmap_entry_obj = 'rtmapEntry'
+        self.action = action
+        self.seq_no = seq_no
+        self.descr = None
+        self.comm_list = []
+        self.v6_prefix_list = []
+        self.v4_prefix_list = []
+        self.as_paths = []
+        self.community = []
+        self.next_hops = []
+        self.rt_types = []
+        self.rt_tags = []
+        self.local_preferences = []
+        self.origin = []
+            
+    def set_descr(self, descr):
+        self.descr = descr
+        
+    def _get_attributes(self):
+        att = {}
+        att['action'] = self.action
+        att['order'] = self.seq_no
+        if self.descr:
+            att['descr'] = self.descr
+        return att
+        
+    def match_rt_type(self, type):
+        match_type = MatchRtType(self.name, self.seq_no, type)
+        self._children.append(match_type)
+        self.rt_types.append(match_type)
+        
+    def match_rt_tag(self, tag):
+        match_tag = MatchRtTag(self.name, self.seq_no, tag)
+        self._children.append(match_tag)
+        self.rt_tags.append(match_tag)
+        
+    def enable_nh_peer(self, version):
+        nh_peer = SetPeerAddr(self.name, self.seq_no, version, 
+                              state='enabled')
+        self._children.append(nh_peer)
+        
+    def disable_nh_peer(self, version):
+        nh_peer = SetPeerAddr(self.name, self.seq_no, version, 
+                              state='disabled')
+        self._children.append(nh_peer)
+        
+    def set_next_hop(self, addr):
+        nxt_hop_addr = SetNextHop(self.name, self.seq_no, addr)
+        self._children.append(nxt_hop_addr)
+        self.next_hops.append(nxt_hop_addr)
+        
+    def set_local_pref(self, local_pref):
+        local_pref = SetLocalPref(self.name, self.seq_no, local_pref)
+        self._children.append(local_pref)
+        self.local_preferences.append(local_pref)
+        
+    def set_origin(self, origin):
+        origin = SetOrigin(self.name, self.seq_no, origin)
+        self._children.append(origin)
+        self.origin.append(origin)
+        
+    def set_comm_list(self, name, delete):
+        comm_list = SetCommList(self.name, self.seq_no, name, delete)
+        self._children.append(comm_list)
+        self.comm_list.append(comm_list)
+        
+    def match_as_path(self, name):
+        as_path_obj = 'rtmapMatchAsPathAccessList'
+        match_obj = RtmapMatch(self.name, self.seq_no, as_path_obj, name)
+        self._children.append(match_obj)
+        self.as_paths.append(match_obj)
+        
+    def match_pfxlistv4(self, name):
+        pfx_v4_obj = 'rtmapMatchRtDst'
+        match_obj = RtmapMatch(self.name, self.seq_no, pfx_v4_obj, name)
+        self._children.append(match_obj)
+        self.v4_prefix_list.append(match_obj)
+        
+    def match_pfxlistv6(self, name):
+        pfx_v6_obj = 'rtmapMatchRtDstV6'
+        match_obj = RtmapMatch(self.name, self.seq_no, pfx_v6_obj, name)
+        self._children.append(match_obj)
+        self.v6_prefix_list.append(match_obj)
+        
+    def match_comm(self, name, criteria='sub-group'):
+        match_comm_obj = 'rtmapMatchRegComm'
+        match_obj = RtmapMatch(self.name, self.seq_no, match_comm_obj, name, 
+                               criteria)
+        self._children.append(match_obj)
+        self.community.append(match_obj)
+        
+    def set_comm(self, community):
+        set_comm = SetRegCom(self.name, self.seq_no, community)
+        self._children.append(set_comm)
+        
+    def get_url(self):
+        """ Return Route-map entry url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' +  
+                self.seq_no + '.json')
+        
+    def get_json(self):
+        return super(RouteMapEntry, self).get_json(
+                                            obj_class=self.rtmap_entry_obj,
+                                            attributes=self._get_attributes())
+    
+
+class RouteMap(BaseNXObject):
+    """
+    This class defines Route-map configuration
+    """
+    def __init__(self, name, session=None, parent=None):
+        super(RouteMap, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.rtmap_obj = 'rtmapRule'
+        self.name = name
+        self.rt_map_entries = []
+    
+    def add(self, rt_obj):
+        self._children.append(rt_obj)
+        self.rt_map_entries.append(rt_obj)
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        return att
+        
+    def get_url(self):
+        """ Return Route-map url """
+        return '/api/node/mo/sys/rpm/rtmap-' + self.name + '.json'
+        
+    def get_json(self):
+        return super(RouteMap, self).get_json(obj_class=self.rtmap_obj,
+                                            attributes=self._get_attributes())
+        
+    @classmethod
+    def get(cls, session, name):
+        """
+        :param session: Session object to communicate with Switch
+        :return Route-map object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        rt_map_obj = 'rtmapRule'
+        query_url = ('/api/node/mo/sys/rpm/rtmap-' + name + '.json?rsp-'
+                     + 'subtree=full')
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            rt_map = RouteMap(str(ret[rt_map_obj]['attributes']['name']))
+            if ret[rt_map_obj].get('children'):
+                for child in ret[rt_map_obj]['children']:
+                    map_att = child['rtmapEntry']['attributes']
+                    map = RouteMapEntry(str(map_att['action']),
+                                        str(map_att['order']))
+                    map.set_descr(str(map_att['descr']))
+                    if child['rtmapEntry'].get('children'):
+                        for g_child in child['rtmapEntry']['children']:
+                            if g_child.get('rtmapMatchRtDstV6'):
+                                att=g_child['rtmapMatchRtDstV6']['children']
+                                for gg_child in att:
+                                    name=gg_child['rtmapRsRtDstV6Att'][
+                                                                'attributes']
+                                    map.match_pfxlistv6(str(name['tDn'][18:]))
+                                    
+                            elif g_child.get('rtmapMatchRtDst'):
+                                att=g_child['rtmapMatchRtDst']['children']
+                                for gg_child in att:
+                                    name=gg_child['rtmapRsRtDstAtt'][
+                                                                'attributes']
+                                    map.match_pfxlistv4(str(name['tDn'][18:]))
+                                    
+                            elif g_child.get('rtmapMatchRegComm'):
+                                att=g_child['rtmapMatchRegComm']['children']
+                                for gg_child in att:
+                                    name=gg_child['rtmapRsRegCommAtt'][
+                                                                'attributes']
+                                    map.match_comm(str(name['tDn'][17:]))
+                                    
+                            elif g_child.get('rtmapMatchAsPathAccessList'):
+                                g_child['rtmapMatchAsPathAccessList'][
+                                                                'attributes']
+                                att=g_child['rtmapMatchAsPathAccessList'][
+                                                                'children']
+                                for gg_child in att:
+                                    name=gg_child['rtmapRsRtAsPathAccAtt'][
+                                                                'attributes']
+                                    map.match_as_path(str(name['tDn'][19:]))
+                                                                   
+                            elif g_child.get('rtmapSetNh'):
+                                att=g_child['rtmapSetNh']['attributes']
+                                map.set_next_hop(str(att['addr']))
+                            elif g_child.get('rtmapSetCommList'):
+                                att=g_child['rtmapSetCommList']['attributes']
+                                map.set_comm_list(str(att['name']), 'delete')
+                            elif g_child.get('rtmapMatchRtType'):
+                                att=g_child['rtmapMatchRtType']['attributes']
+                                map.match_rt_type(str(att['routeT']))
+                            elif g_child.get('rtmapMatchRtTag'):
+                                att=g_child['rtmapMatchRtTag']['attributes']
+                                map.match_rt_tag(str(att['tag']))
+                            elif g_child.get('rtmapSetPref'):
+                                att=g_child['rtmapSetPref']['attributes']
+                                map.set_local_pref(str(att['localPref']))
+                            elif g_child.get('rtmapSetOrigin'):
+                                att=g_child['rtmapSetOrigin']['attributes']
+                                map.set_origin(str(att['originT']))
+                            
+                                
+                    rt_map.add(map)
+                    
+            return rt_map
+        
+        
+class RtPrefix(BaseNXObject):
+    """
+    This class defines Prefix address configuration
+    """
+    def __init__(self, address, action='permit', seq_no='5', session=None, 
+                 parent=None):
+        super(RtPrefix, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.pfx_obj = 'rtpfxEntry'
+        self.pfx_addr = address
+        self.action = action
+        self.seq_no = seq_no
+
+    def _get_attributes(self):
+        att = {}
+        att['action'] = self.action
+        att['pfx'] = self.pfx_addr
+        att['order'] = self.seq_no
+        return att
+        
+    def get_url(self):
+        """ Return Prefix address url """
+        return '/api/node/mo/'+ self.pfx_addr + '.json'
+        
+    def get_json(self):
+        return super(RtPrefix, self).get_json(obj_class=self.pfx_obj,
+                                         attributes=self._get_attributes()) 
+        
+                                            
+class PrefixList(BaseNXObject):
+    """
+    This class defines Prefix list configuration
+    """
+    def __init__(self, name, version='v4', session=None, parent=None):
+        super(PrefixList, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        if version == 'v4':
+            self.pfx_list_obj = 'rtpfxRuleV4'
+        elif version == 'v6':
+            self.pfx_list_obj = 'rtpfxRuleV6'
+        else:
+            raise TypeError("Provide proper version")
+        self.name = name
+        self.prefix_list = []
+        
+    def set_prefix(self, pfx_addr, action=None, seq_no=None):
+        pfx = RtPrefix(pfx_addr, action, seq_no)
+        self._children.append(pfx)
+        self.prefix_list.append(pfx)
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        return att
+        
+    def get_url(self):
+        """ Return Prefix list url """
+        if self.pfx_list_obj == 'rtpfxRuleV6':
+            return '/api/node/mo/sys/rpm/pfxlistv6-' + self.name + '.json'
+        else:
+            return '/api/node/mo/sys/rpm/pfxlistv4-' + self.name + '.json'
+        
+    def get_json(self):
+        return super(PrefixList, self).get_json(obj_class=self.pfx_list_obj,
+                                            attributes=self._get_attributes())
+        
+    @classmethod
+    def get(cls, session, name, version='v4'):
+        """
+        :param session: Session object to communicate with Switch
+        :return PrefixList object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        if version == 'v4':
+            prefix_obj = 'rtpfxRuleV4'
+            query_url = ('/api/node/mo/sys/rpm/pfxlistv4-' + name + 
+                         '.json?rsp-' + 'subtree=full')
+        elif version == 'v6':
+            prefix_obj = 'rtpfxRuleV6'
+            query_url = ('/api/node/mo/sys/rpm/pfxlistv6-' + name + 
+                         '.json?rsp-' + 'subtree=full')
+        else:
+            raise TypeError('Provide proper Verion')
+        
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:
+            prefix = PrefixList((str(ret[prefix_obj]['attributes']
+                                         ['name'])), version)
+            if ret[prefix_obj].get('children'):
+                for child in ret[prefix_obj]['children']:
+                    pfx_att = child['rtpfxEntry']['attributes']
+                    prefix.set_prefix(str(pfx_att['pfx']), 
+                                      str(pfx_att['action']),
+                                      str(pfx_att['order']))
+            return prefix
+        
+
+class AccessList(BaseNXObject):
+    """
+    This class defines access list configuration
+    """
+    def __init__(self, name, action, regex, seq_no=None, session=None, 
+                 parent=None):
+        super(AccessList, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.acc_list_obj = 'rtlistEntry'
+        self.name = name
+        self.action = action
+        self.regex = regex
+        self.seq_no = seq_no
+
+    def _get_attributes(self):
+        att = {}
+        att['action'] = self.action
+        att['regex'] = self.regex
+        if self.seq_no:
+            att['order'] = self.seq_no
+        else: 
+            att['order'] = '1'
+        return att
+        
+    def get_url(self):
+        """ Return access list url """
+        return ('/api/node/mo/sys/rpm/accesslist-'+ self.name + '/ent-' + 
+                self.seq_no + '.json')
+        
+    def get_json(self):
+        return super(AccessList, self).get_json(obj_class=self.acc_list_obj,
+                                         attributes=self._get_attributes()) 
+
+
+class AsPath(BaseNXObject):
+    """
+    This class defines As Path configuration
+    """
+    def __init__(self, name, session=None, parent=None):
+        super(AsPath, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.as_path_obj = 'rtlistRule'
+        self.name = name
+        self.access_lists = []
+        
+    def set_access_list(self, action, regex, seq_no=None):
+        access = AccessList(self.name, action, regex, seq_no)
+        self._children.append(access)
+        self.access_lists.append(access)
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        return att
+        
+    def get_url(self):
+        """ Return As Path url """
+        return '/api/node/mo/sys/rpm/accesslist-' + self.name + '.json'
+        
+    def get_json(self):
+        return super(AsPath, self).get_json(obj_class=self.as_path_obj,
+                                            attributes=self._get_attributes())
+        
+    @classmethod
+    def get(cls, session, name):
+        """
+        :param session: Session object to communicate with Switch
+        :return As path object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        as_path_obj = 'rtlistRule'
+        query_url = ('/api/node/mo/sys/rpm/accesslist-' + name + '.json?rsp-'
+                     + 'subtree=full')
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            as_path = AsPath(str(ret[as_path_obj]['attributes']['name']))
+            if ret[as_path_obj].get('children'):
+                for child in ret[as_path_obj]['children']:
+                    list_att = child['rtlistEntry']['attributes']
+                    as_path.set_access_list((str(list_att['action'])),
+                                    (str(list_att['regex'])),
+                                    (str(list_att['order'])))
+            return as_path
+
+
+class CommunityItem(BaseNXObject):
+    """
+    This class defines community item configuration
+    """
+    def __init__(self, community, session=None, parent=None):
+        super(CommunityItem, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.comm_obj = 'rtregcomItem'
+        if community == 'internet':
+            self.community = '0:0'
+        elif community == 'local-AS':
+            self.community = '65535:65283'
+        elif community == 'no-advertise':
+            self.community = '65535:65282'
+        elif community == 'no-export':
+            self.community = '65535:65281'
+        else:
+            self.community = community
+            
+    def _get_attributes(self):
+        att = {}
+        att['community'] = 'regular:as2-nn2:' + self.community
+        return att
+        
+    def get_url(self):
+        """ Return set community url """
+        return ('/api/node/mo/sys/rpm/rtmap-' + self.name + '/ent-' + 
+                self.seq_no + '/sregcomm/item-regular:as2-nn2:' + 
+                self.community +'.json')
+        
+    def get_json(self):
+        return super(CommunityItem, self).get_json(obj_class=self.comm_obj,
+                                            attributes=self._get_attributes())
+        
+
+class CommunityEntry(BaseNXObject):
+    """
+    This class defines community-entry configuration
+    """
+    def __init__(self, action, community, seq_no='1', session=None, 
+                 parent=None):
+        super(CommunityEntry, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.comm_obj = 'rtregcomEntry'
+        self.action = action
+        self.seq_no = seq_no
+        self.comm_items = []
+        community = community.split(',')
+        self.add(community)
+        
+    def add(self, community):
+        for comm in community:
+            com_item = CommunityItem(comm)
+            self._children.append(com_item)
+            self.comm_items.append(com_item)
+        
+    def _get_attributes(self):
+        att = {}
+        att['action'] = self.action
+        att['order'] = self.seq_no
+        return att
+        
+    def get_url(self):
+        """ Return community-entry url """
+        return ('/api/node/mo/sys/rpm/rtregcom-' + self.name + '.json')
+        
+    def get_json(self):
+        return super(CommunityEntry, self).get_json(obj_class=self.comm_obj,
+                                            attributes=self._get_attributes())
+
+        
+class CommunityList(BaseNXObject):
+    """
+    This class defines community-list configuration
+    """
+    def __init__(self, name, mode, session=None, parent=None):
+        super(CommunityList, self).__init__(name)
+        self._session= session
+        self._parent = parent
+        self.comm_obj = 'rtregcomRule'
+        self.name = name
+        self.mode = mode
+        self.comm_entries = []
+        
+    def add(self, comm_entry_obj):
+        self._children.append(comm_entry_obj)
+        self.comm_entries.append(comm_entry_obj)
+        
+    def _get_attributes(self):
+        att = {}
+        att['name'] = self.name
+        att['mode'] = self.mode
+        return att
+        
+    def get_url(self):
+        """ Return community-list url """
+        return ('/api/node/mo/sys/rpm/rtregcom-' + self.name + '.json')
+        
+    def get_json(self):
+        return super(CommunityList, self).get_json(obj_class=self.comm_obj,
+                                            attributes=self._get_attributes())
+        
+    @classmethod
+    def get(cls, session, name):
+        """
+        :param session: Session object to communicate with Switch
+        :return As path object
+        """
+        if not isinstance(session, Session):
+            raise TypeError('An instance of Session class is required') 
+        
+        comm_obj = 'rtregcomRule'
+        query_url = ('/api/node/mo/sys/rpm/rtregcom-' + name + '.json?rsp-'
+                     + 'subtree=full')
+        resp = session.get(query_url).json()['imdata']
+        for ret in resp:  
+            com_list = CommunityList(str(ret[comm_obj]['attributes']['name']),
+                                    str(ret[comm_obj]['attributes']['mode']))
+            if ret[comm_obj].get('children'):
+                for child in ret[comm_obj]['children']:
+                    att = child['rtregcomEntry']['attributes']
+                    g_child = child['rtregcomEntry']['children']
+                    community = []
+                    for item in g_child:
+                        comm = item['rtregcomItem']['attributes']['community']
+                        community.append(comm[16:])
+                    entry=CommunityEntry(str(att['action']),
+                                         ','.join(community),
+                                         str(att['order']))
+                    com_list.add(entry)
+            return com_list
+        
+        
+class RPM(BaseNXObject):
+    """
+    This class defines Route Processor Module configuration
+    """
+    def __init__(self, session=None, parent=None):
+        super(RPM, self).__init__(name='')
+        self._session= session
+        self._parent = parent
+        self.rpm_obj = 'rpmEntity'
+    
+    def add(self, rpm_obj):
+        self._children.append(rpm_obj)
+        
+    def get_url(self):
+        """ Return RPM url """
+        return '/api/node/mo/sys/rpm.json'
+        
+    def get_json(self):
+        return super(RPM, self).get_json(obj_class=self.rpm_obj,
+                                         attributes={})        
 
