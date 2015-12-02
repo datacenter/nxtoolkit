@@ -147,9 +147,9 @@ class InterfaceStats(object):
                                 if att in ['broadcastPkts', 'multicastPkts',  'ucastPkts']:
                                     result[count]['totalPkts'] += int(counterAttr[att])
                                     result[count][att] = int(counterAttr[att])
-                                elif att in ['octetRate', 'packetRate']:
+                                elif att in ['octetRate', 'packetRate', 'dropEvents', 'ifdowndrop']:
                                     result[count][att] = float(counterAttr[att])
-                                elif att not in skip_attr_list: 
+                                elif att not in skip_attr_list:
                                     result[count][att] = counterAttr[att]
 
         return result
@@ -173,7 +173,7 @@ class InterfaceStats(object):
                   it will return 0.
         """
            
-        if countName in ['octetRate', 'packetRate']:
+        if countName in ['octetRate', 'packetRate', 'dropEvents', 'ifdowndrop']:
             result = 0.0
         else:
             result = 0

@@ -36,8 +36,8 @@ def show_stats_short(args, interfaces):
     """
     # setup template and display header information
     template = "{0:16} {1:16} {2:16} {3:16} {4:16} {5:16}"
-    print(template.format("   INTERFACE  ", "Status", "RX PKTs/Sec",
-                          "TX PKTs/Sec", "RX BYTES/Sec", "TX BYTES/Sec"))
+    print(template.format("   INTERFACE  ", "Status", "RX BYTES/Sec", 
+                          "TX BYTES/Sec", "RX PKTs/Sec","TX PKTs/Sec"))
     print(template.format("--------------", "------------ ", "------------ ",
                           "---------------", "---------------",
                           "---------------"))
