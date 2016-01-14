@@ -1597,20 +1597,20 @@ class Interface(BaseInterface):
         self.type = 'interface'
         self.attributes['type'] = 'interface'
         
-        self._layer = None  # Layer2 or Layer3
-        self._mode = 'access' # access, trunk, fex-fabric
-        self._snmp_trap_st = 'default' # enable/disable/default
-        self._adminstatus = None  # up or down
-        self._speed = '10G'  # 100M, 1G, 10G or 40G
-        self._mtu = '1500'
-        self._link_log = 'default' # enable/disable/default
-        self._trunk_log = 'default' #enable/disable/default
-        self._duplex = 'auto' # auto/half/full
-        self._access_vlan = None
-        self._trunk_vlans = None
+        # get attributes from self.attributes if available, otherwise use default values
+        self._layer = self.attributes.get('layer', None)
+        self._mode = self.attributes.get('mode', 'access')
+        self._snmp_trap_st = self.attributes.get('snmpTrapSt', 'default')
+        self._adminstatus = self.attributes.get('adminstatus', None) 
+        self._speed = self.attributes.get('speed', '10G') 
+        self._mtu = self.attributes.get('mtu', '1500')
+        self._link_log = self.attributes.get('linkLog', 'default')
+        self._trunk_log = self.attributes.get('trunkLog', 'default') 
+        self._duplex = self.attributes.get('duplex', 'auto') 
+        self._access_vlan = self.attributes.get('accessVlan', None)
+        self._trunk_vlans = self.attributes.get('trunkVlans', None)
+        self._descr = self.attributes.get('descr', '')
         self._native_vlan = None
-        self._descr = ''
-        
         self.object = 'l1PhysIf'
 
         self._parent = parent
@@ -2044,7 +2044,7 @@ class Interface(BaseInterface):
 
         for interface in interface_data:
             if 'l1PhysIf' in interface:
-                attributes = {}
+		attributes = interface['l1PhysIf']['attributes']
                 dist_name = str(interface['l1PhysIf']['attributes']['dn'])
                 attributes['dist_name'] = dist_name
                 porttype = str(interface['l1PhysIf']['attributes']['portT'])
@@ -2057,11 +2057,6 @@ class Interface(BaseInterface):
                 attributes['mtu'] = mtu
                 identifier = str(interface['l1PhysIf']['attributes']['id'])
                 attributes['id'] = identifier
-                attributes['monPolDn'] = str(interface['l1PhysIf']['attributes']['monPolDn'])
-                attributes['name'] = str(interface['l1PhysIf']['attributes']['name'])
-                attributes['descr'] = str(interface['l1PhysIf']['attributes']['descr'])
-                attributes['usage'] = str(interface['l1PhysIf']['attributes']['usage'])
-                attributes['layer'] = str(interface['l1PhysIf']['attributes']['layer'])
                 (interface_type, module, port) = Interface.parse_dn(dist_name)
                 attributes['interface_type'] = interface_type
                 attributes['module'] = module
