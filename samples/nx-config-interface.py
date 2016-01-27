@@ -44,8 +44,8 @@ def main():
         print('%% Could not login to Switch')
         sys.exit(0)
 
-    int1 = NX.Interface('eth1/13')
-    int2 = NX.Interface('eth1/14')
+    int1 = NX.Interface('eth1/6')
+    int2 = NX.Interface('eth1/7')
     
     # ConfigInterfacs object is used to configure multiple 
     # interfaces at a time (No need of multiple REST calls)

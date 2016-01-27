@@ -2087,7 +2087,6 @@ class PortChannel(BaseInterface):
             query_url = '/api/class/pcAggrIf.json?rsp-subtree=full'
 
         pc_list = []
-        
         port_chs = session.get(query_url).json()['imdata']
         for pc in port_chs:
             pc_id = str(pc['pcAggrIf']['attributes']['pcId'])
@@ -3244,8 +3243,10 @@ class LinkNeighbors(BaseNXObject):
             
         if module and port:
             children = neighbors
-        else:
+        elif len(neighbors) > 0:
             children = neighbors[0][disc_proto+'Inst']['children']
+        else:
+            children = []
 
         resp = []
         adj_epg = disc_proto+'AdjEp'
