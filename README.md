@@ -6,9 +6,6 @@
 The NX Toolkit is a set of python libraries that allow basic
 configuration of the Cisco Nexus Switch. It is intended to allow users to quickly begin using the REST API and accelerate the learning curve necessary to begin using the Switch.
 
-The full documentation is published at the following link:
-[http://datacenter.github.io/nxtoolkit/](http://datacenter.github.io/nxtoolkit/)
-
 
 # Installation
 
