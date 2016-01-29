@@ -3790,6 +3790,7 @@ class SVI(BaseNXObject):
         
         super(SVI, self).__init__(name=vlan)
         self.id = vlan #vlan id
+        self.if_name = vlan
         self.descr = descr
         self.admin_st = admin_st
         self.mtu = None
@@ -4538,7 +4539,7 @@ class IP(BaseNXObject):
         if self.version == 'v4' and link_local:
             raise TypeError('Link local is not applicable for ipv4')
 
-        if not isinstance(interface, (Interface, PortChannel)):
+        if not isinstance(interface, (Interface, PortChannel, SVI)):
             raise TypeError('Interface or PortChannel instance expected')
         
         if not IP.is_valid_ip(addr.split('/')[0], self.version):
