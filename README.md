@@ -2,9 +2,12 @@
 
 
 # Description
+Command line interface is being used so far extensively to control and manage network switches. But the CLI dependance could be holding us back, preventing from true programmability in those switches and more comprehensive automation of our network.
 
-The NX Toolkit is a set of python libraries that allow basic
-configuration of the Cisco Nexus Switch. It is intended to allow users to quickly begin using the REST API and accelerate the learning curve necessary to begin using the Switch.
+Object Model/NX-API REST used in ACI and of the Cisco NX-OS provide an advanced framework for network control and achieve true network programmability
+NXtoolkit is a object based programmability in the Open NX-OS.Nxtoolkit is a set of python libraries that allow basic configuration of the Cisco Nexus 9000/3000 Series Switch. It is intended to allow users to quickly begin using the REST API and accelerate the process of programming and automating a Cisco Nexus 9000/3000 based network.
+
+The NX Toolkit is a set of python libraries that allow basic configuration of the Cisco Nexus Switch. It is intended to allow users to quickly begin using the REST API and accelerate the learning curve necessary to begin using the Switch.
 
 
 # Installation
